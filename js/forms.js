@@ -978,10 +978,9 @@ async function loadBulkCaseForm(){
   // (disabled/aktif) bcChipsRender'da kurulur. V2.3-W20: yazma TEK kapı
   // bcTarihYaz — görüntü DD.MM.YYYY + kanonik ISO birlikte kurulur.
   bcTarihYaz(bugun());
-  const tohumSaatEl = g('bc-tohum-saat'); if(tohumSaatEl) tohumSaatEl.value = '08:00';
+  saatYaz('bc-tohum-saat', '08:00');
   const tohumGunEl = g('bc-tohum-gun'); if(tohumGunEl) tohumGunEl.value = '0';
   const tohumChkEl = g('bc-tohum'); if(tohumChkEl) tohumChkEl.checked = false;
-  bcTohumSaatChipsRender();
   bcTarihIpucuGuncelle();
   if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
   bcPlanRender(); // gün kartları + açık seans formu (ilaç listesi dahil)
@@ -1348,20 +1347,6 @@ function bcTarihSecimEkle(secim, tarihISO, bugunStr){
   return { ok: true, secim: String(tarihISO), mesaj: null };
 }
 
-// HIZLI_SAATLER çipleri (config.js) — ek-chip deseni, bc-tohum-saat'i doldurur.
-/**
- * 'bc-tohum-saat-chips' seçili kutuya hızlı saat seçeneklerini (veya varsayılan saatleri) içeren butonlar oluşturarak ekler.
- * @returns {void}
- */
-function bcTohumSaatChipsRender(){
-  const kutu = g('bc-tohum-saat-chips');
-  if(!kutu) return;
-  const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
-  kutu.innerHTML = saatler.map(t =>
-    `<button type="button" class="ek-chip" data-action="bc-tohum-saat-chip" data-t="${t}">${t}</button>`
-  ).join('');
-}
-
 // ── TOPLU VAKA MANUEL TEDAVİ PLANI (V1.1 → V2.1 GÜN KARTLARI) ─────────
 // V2.1 (sahibe beyin fırtınası, 2026-09-06): plan editörü m-sablon builder
 // + seans planlayıcı diline taşındı — ÜST ÜSTE KATLANABİLİR GÜN KARTLARI
@@ -1635,14 +1620,10 @@ function _bcSeanslariCiz(gun){
  * @returns {string} Seans formunu oluşturan HTML string.
  */
 function _bcSeansFormHtml(gun){
-  const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
-  const chips = saatler.map(t => `<button type="button" class="ek-chip" data-action="bc-saat-chip" data-t="${t}">${t}</button>`).join('');
   return `
   <div style="border:1px dashed var(--card3);border-radius:10px;padding:10px;margin-top:6px;background:var(--card2)">
     <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">⏰ Yeni Seans — Saat</div>
-    <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-      <input id="bc-gsaat" class="fi" type="time" value="09:00" style="margin:0;flex:1;min-width:100px">${chips}
-    </div>
+    <div style="margin-bottom:8px">${saatAlaniHtml('bc-gsaat', { deger: '09:00' })}</div>
     <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>
     <div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">${_bcSeansDrugGruplariHtml()}</div>
     <div id="bc-sdoz-alani" style="display:none">
@@ -1800,6 +1781,7 @@ async function bcSablonKaydet(){
   // konvansiyonu — jsonb 'null' normalize dili). Şablon semantiği: plan
   // tarihi = vaka start_date + gun_ofset — 'Kaç gün sonra' ile aynı dil.
   const tohumIste = !!g('bc-tohum')?.checked;
+  if(tohumIste && saatYarimMi('bc-tohum-saat')) return;
   const tohumPayload = bcSablonTohumPayload(tohumIste, v('bc-tohum-gun'), v('bc-tohum-saat'));
   const kayitPayload = { kalemler };
   if(tohumPayload) kayitPayload.tohumlama_plani = tohumPayload;
@@ -1934,11 +1916,10 @@ async function bcSablonYukleUygula(sablon, kalemler){
   globalThis._bcKopyaAcikGun = null;
   const tohumChkEl = g('bc-tohum');
   const tohumGunEl = g('bc-tohum-gun');
-  const tohumSaatEl = g('bc-tohum-saat');
   if(tohumChkEl) tohumChkEl.checked = !!plan.tohumlama;
   if(plan.tohumlama){
     if(tohumGunEl) tohumGunEl.value = String(plan.tohumlama.gun_ofset);
-    if(tohumSaatEl) tohumSaatEl.value = plan.tohumlama.planned_time;
+    saatYaz('bc-tohum-saat', plan.tohumlama.planned_time);
   }
   bcSablonaDonustur(); // şablon radyosu → 'Şablonsuz' (gönderim p_items yolu)
   bcPlanRender();
@@ -2595,20 +2576,6 @@ function _bcSeansDozSatiri(ds){
   return row;
 }
 
-/**
- * Belirtilen saat değerini 'bc-gsaat' elemanına ayarlar ve butona 'aktif' sınıfını ekler.
- * Buton varsa, aynı ebeveyn içindeki tüm '.ek-chip' elemanlarından 'aktif' sınıfını kaldırır.
- * @param {string} t Ayarlanacak saat değeri.
- * @param {HTMLElement} btn 'aktif' sınıfını eklenmesi ve diğer chip'lerin pasif hale getirilmesi gereken buton elemanı.
- * @returns {void}
- */
-function bcSeansSaatChip(t, btn){
-  const i = g('bc-gsaat');
-  if(i) i.value = t;
-  if(btn && btn.parentElement) btn.parentElement.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
-  if(btn) btn.classList.add('aktif');
-}
-
 // [Seansı Ekle]: saat + işaretli ilaçların doz/birim'ini doğrular
 // (sablonSeansEkle aynası), kalem state'e YAZAR, seansı saate göre ASC
 // ekler, seans listesini cerrahi çizer; form AÇIK kalır, yalnız saat
@@ -2657,11 +2624,7 @@ function bcSeansEkle(gun){
   gunObj.seanslar.push({ saat, ilaclar });
   gunObj.seanslar.sort((a, b) => (a.saat || '').localeCompare(b.saat || ''));
   _bcSeanslariCiz(gun);
-  const saatInp = g('bc-gsaat');
-  if(saatInp){
-    saatInp.value = '09:00';
-    if(saatInp.parentElement) saatInp.parentElement.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
-  }
+  saatYaz('bc-gsaat', '09:00');
   bcButonEtiketi();
 }
 
@@ -3252,6 +3215,7 @@ async function submitBulkCase(btn){
   const tohumMod = bcTohumBlokDurumu(liste).mod;
   const tohumChkEl = g('bc-tohum');
   const tohumIste = !!(tohumMod === 'aktif' && tohumChkEl && tohumChkEl.checked);
+  if (tohumIste && saatYarimMi('bc-tohum-saat')) return;
   const tohumGun = tohumIste
     ? Math.max(0, Math.min(365, Number.parseInt(v('bc-tohum-gun'), 10) || 0))
     : 0;

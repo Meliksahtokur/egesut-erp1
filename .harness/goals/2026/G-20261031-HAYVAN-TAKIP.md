@@ -49,6 +49,7 @@ write_manifest:
   - tests/unit/hayvan-takip-vaka.test.js
   - tests/unit/saat-alani.test.js
   - tests/unit/forms-validation.test.js
+  - tests/unit/vaka-toplu-ac.test.js
 docs_authority:
   tracked_paths:
     write:

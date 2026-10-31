@@ -10712,14 +10712,12 @@ function sablonSeansAc(gi){
     }).join('');
     return '<div style="margin-bottom:8px"><div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--card3)">'+grp+'</div>'+items+'</div>';
   }).join('');
-  const saatChips = HIZLI_SAATLER.map(t=>`<button type="button" class="btn-sm" data-action="sablon-saat-chip" data-t="${t}" style="padding:5px 10px;background:rgba(42,107,181,.1);color:var(--blue);border:none;border-radius:6px;cursor:pointer;margin-right:4px;font-weight:700">${t}</button>`).join('');
   const wrap = document.getElementById('sablon-gun-body-'+gi);
   const form = document.createElement('div');
   form.style.cssText='border:1px dashed var(--card3);border-radius:10px;padding:10px;margin-top:6px;background:var(--card2)';
   form.innerHTML =
     '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">⏰ Saat</div>'+
-    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
-    `<input id="sbs-time" class="fi" type="time" value="${HIZLI_SAATLER[0]}" style="margin:0;flex:1;min-width:100px">`+saatChips+'</div>'+
+    '<div style="margin-bottom:8px">'+saatAlaniHtml('sbs-time', { deger: HIZLI_SAATLER[0] })+'</div>'+
     '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>'+
     '<div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">'+
     (groupHtml||'<div style="color:var(--ink3);font-size:.78rem;padding:8px">İlaç bulunamadı</div>')+'</div>'+
@@ -10733,12 +10731,6 @@ function sablonSeansAc(gi){
   _sablonSeansForm = form;
 }
 
-/**
- * Belirtilen saati 'sbs-time' ID'li elemanın değerine atar.
- * @param {string} t Atanacak saat değeri.
- * @returns {void} Hiçbir değer döndürmez.
- */
-function sablonSaatChip(t){ const i=document.getElementById('sbs-time'); if(i) i.value=t; }
 /**
  * Şablon oluşturucuda seçilen güne tohumlama planı ekler; şablon adını senkronize eder, seçilen günün ofseti ve '08:00' planlı saatiyle tohumlama planını ayarlar ve şablon oluşturucuyu yeniden render eder.
  * @param {number|string} gi - Tohumlama planının ekleneceği günün şablon düzenleyicideki indeksi.
@@ -17484,8 +17476,6 @@ async function caseSeansEkleFormAc(dayId) {
     return '<div style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">' + grp + '</div>' + items + '</div>';
   }).join('');
 
-  const saatChips = HIZLI_SAATLER.map(h => `<button type="button" class="ek-chip" onclick="seansAddSaatSec('${h}',this)">${h}</button>`).join('');
-
   const form = document.createElement('div');
   form.className = 'cd-seans-form';
   form.style.cssText = 'margin-top:8px;background:var(--card2);border-radius:10px;padding:10px';
@@ -17493,9 +17483,7 @@ async function caseSeansEkleFormAc(dayId) {
     '<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⏰ Seans Planı</div>' +
     mevcutHtml +
     '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin:8px 0 6px">＋ Yeni Seans — Saat</div>' +
-    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
-    `<input id="seans-add-time" class="fi" type="time" value="${HIZLI_SAATLER[0]}" style="margin:0;flex:1;min-width:90px">` +
-    saatChips + '</div>' +
+    '<div style="margin-bottom:8px">' + saatAlaniHtml('seans-add-time', { deger: HIZLI_SAATLER[0] }) + '</div>' +
     '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>' +
     '<div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">' +
     (groupHtml || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilaç yok</div>') + '</div>' +
@@ -17507,19 +17495,6 @@ async function caseSeansEkleFormAc(dayId) {
     '<button onclick="this.closest(\'.cd-seans-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Kapat</button>' +
     '</div>';
   container.appendChild(form);
-}
-
-/**
- * Belirtilen saati 'seans-add-time' inputuna ayarlar ve butona 'aktif' sınıfını eklerken diğer tüm '.ek-chip' elemanlarından bu sınıfı kaldırır.
- * @param {string} h Ayarlanacak saat değeri.
- * @param {HTMLElement} btn Aktif sınıfı eklenecek buton elemanı.
- * @returns {void} Fonksiyon bir değer döndürmez.
- */
-function seansAddSaatSec(h, btn) {
-  const inp = document.getElementById('seans-add-time');
-  if (inp) inp.value = h;
-  btn?.parentElement?.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
-  btn?.classList.add('aktif');
 }
 
 /**

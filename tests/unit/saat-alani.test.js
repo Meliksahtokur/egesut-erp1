@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadBrowserModule, makeElement } = require('./support/loadModule.js');
+const { loadBrowserModule, loadExtractedFunction, makeElement } = require('./support/loadModule.js');
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const oku = yol => fs.readFileSync(path.join(REPO_ROOT, yol), 'utf8');
@@ -183,6 +183,29 @@ test('S-09: yarım giriş uyarır ve true döner; geçerli, boş ya da olmayan a
   assert.strictEqual(k.toastlar.length, 1);
   assert.ok(k.toastlar[0].e, 'hata tonu');
   assert.match(k.toastlar[0].m, /Saat/);
+});
+
+test('G2 #4-7: kopyalar kalktı, tek çip dili; dolu başlangıçlar korunur', () => {
+  const { s } = kur();
+  const birlesik = ['js/forms.js', 'js/ui.js', 'js/utils/handlers.js'].map(oku).join('\n');
+  for (const eski of ['bcSeansSaatChip', 'bcTohumSaatChipsRender', 'seansAddSaatSec', 'sablonSaatChip', 'bc-saat-chip', 'bc-tohum-saat-chip', 'sablon-saat-chip', 'bc-tohum-saat-chips']) {
+    assert.ok(!birlesik.includes(eski) && !oku('index.html').includes(eski), eski);
+  }
+  const html = loadExtractedFunction('js/forms.js', '_bcSeansFormHtml', {
+    extra: { saatAlaniHtml: s.saatAlaniHtml, _bcSeansDrugGruplariHtml: () => '' },
+  })(1);
+  assert.match(html, /<input id="bc-gsaat" class="fi" type="time" value="09:00"/);
+  const cipler = cipleriOku(html).filter(c => c.dataset.action === 'saat-chip');
+  assert.deepStrictEqual(cipler.map(c => c.dataset.t), [...HIZLI_SAATLER]);
+  assert.ok(!cipler.some(c => c.classList.contains('aktif')), '09:00 çipte yok');
+  const ui = oku('js/ui.js');
+  assert.match(ui, /saatAlaniHtml\('sbs-time', \{ deger: HIZLI_SAATLER\[0\] \}\)/);
+  assert.match(ui, /saatAlaniHtml\('seans-add-time', \{ deger: HIZLI_SAATLER\[0\] \}\)/);
+  assert.match(oku('index.html'), /<div class="saat-alani"><input id="bc-tohum-saat" class="fi" type="time" value="08:00"[^>]*><\/div>/);
+  const forms = oku('js/forms.js');
+  assert.match(forms, /saatYaz\('bc-tohum-saat', '08:00'\)/);
+  assert.match(forms, /saatYaz\('bc-tohum-saat', plan\.tohumlama\.planned_time\)/);
+  assert.match(forms, /saatYaz\('bc-gsaat', '09:00'\)/);
 });
 
 test('S-10: tek genel handler ve statik bağlama', () => {
