@@ -12,6 +12,7 @@ test('migration-sira-kilidi', (t) => {
   const git = (...a) => execFileSync('git', a, { cwd: KOK }).toString().trim();
   let taban = ''; try { taban = git('rev-parse', '--verify', '--quiet', '24c29f1^{commit}'); } catch { /* sığ klon */ }
   if (!taban) t.diagnostic('sığ klon: 24c29f1 yok — yalnız çalışma ağacı (HEAD) denetlendi');
-  const degisen = git('diff', '--name-only', '--diff-filter=MDR', taban || 'HEAD', '--', 'supabase/migrations');
+  const degisen = git('diff', '--name-only', '--diff-filter=MDR', taban || 'HEAD', '--', 'supabase/migrations',
+    ':!supabase/migrations/99999999999999_ground_truth.sql'); // GT tarihçe değil, canlı şema aynası: runbook'la güncellenir
   assert.strictEqual(degisen, '', 'eski migration Modify/Delete YOK');
 });

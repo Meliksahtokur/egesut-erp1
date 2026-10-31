@@ -88,8 +88,8 @@ BEGIN
   -- TEST 4: konservatif backfill — 4 sinif (migration DO blogu ile ayni mantik)
   ------------------------------------------------------------------
   -- (a) auto + cok-aday(claim-cakisma): TEK hayvanlar adayi, ama ayni calf'i iki dogum
-  --     satiri istiyor. NOT: hayvanlar.kupe_no tam unique oldugu icin (uq_hayvanlar_kupe_no)
-  --     "cok-aday" sinifinin canli verideki tek gercek kaynagi claim-cakismasidir.
+  --     satiri istiyor. NOT: K1 geregi kupe_no yalniz Aktif icinde tekildir (hayvanlar_kupe_no_key); bu vaka tek adayli
+  --     claim-cakismasidir. Ayni kupe olu+aktif iki satirdaysa sinif yine cok-aday olur, NULL kalir.
   INSERT INTO public.hayvanlar (id, kupe_no, irk, cinsiyet, grup, padok, durum, dogum_tarihi)
   VALUES ('__W1T_BF1CALF', '__W1T_BF1', 'Hint', 'Dişi', 'Test Grup', 'Test Padok', 'Aktif', DATE '2024-06-01');
   INSERT INTO public.dogum (anne_id, tarih, yavru_kupe)
