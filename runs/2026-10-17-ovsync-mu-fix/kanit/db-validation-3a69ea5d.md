@@ -28,7 +28,7 @@
 $ sqlfluff lint --dialect postgres 'supabase/migrations/20261017100001_ovsync_mu_log_kolu.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table 'supabase/migrations/20261017100001_ovsync_mu_log_kolu.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash 'scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash 'scripts/db-build-baseline.sh' --json --db-url postgres://postgres:<parola>@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261017100001_ovsync_mu_log_kolu.sql'  # db=egesut_val_tmp
 ```
 
