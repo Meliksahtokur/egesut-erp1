@@ -515,6 +515,12 @@ BEGIN
   PERFORM pg_temp.ht_dogru(p.prosecdef, 'DEFINER değil');
   PERFORM pg_temp.ht_dogru('search_path=public, pg_temp' = ANY (p.proconfig), 'search_path sabit değil');
 END $t$);
+-- Kilitler: vaka FOR SHARE, hayvan FOR NO KEY UPDATE. Eşzamanlı davranış: tests/sql/hayvan_takip_kilit_test.sh.
+SELECT pg_temp.ht_test('V08', $t$ DECLARE src text := (SELECT prosrc FROM pg_proc WHERE oid = 'public.hayvan_takip_muayene_vaka(uuid,uuid,text)'::regprocedure);
+BEGIN
+  PERFORM pg_temp.ht_dogru(src ~ 'public\.cases c\s+WHERE[^;]*FOR SHARE;', 'vaka satırı kilitli değil');
+  PERFORM pg_temp.ht_dogru(src ~ 'public\.hayvanlar\s+WHERE[^;]*FOR NO KEY UPDATE;', 'hayvan kilidi NO KEY UPDATE değil');
+END $t$);
 SELECT pg_temp.ht_test('C01', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t1 uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun() + 1); g uuid := pg_temp.ht_acik_id(t1);
   t2 uuid := pg_temp.ht_ac(h, 'ZAYIFLAMA'); t3 uuid := pg_temp.ht_ac(h, 'ISTAHSIZLIK'); x uuid; r jsonb;
 BEGIN

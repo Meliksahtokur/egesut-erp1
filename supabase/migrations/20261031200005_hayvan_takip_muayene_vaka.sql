@@ -1,7 +1,8 @@
 -- Migration: Muayene sonucundan vakaya bağ
 -- Tarih: 2026-10-31. Kaynak: sahip kararı ("muayene tedavi planı ile kapanmıyor oraya bağlanamıyor"), domain-rules §20.5-7. Önceki migration: 20261031200004.
 -- BEGIN/COMMIT yok: runbook ve test sarmalayıcısı dışarıdan sarar. Prod apply sahip kapısındadır.
--- Kilit sırası ve ret kodları hayvan_takip_muayene_sonuc ile aynı; ek olarak HT_VAKA_UYUMSUZ.
+-- Kilit sırası ve ret kodları hayvan_takip_muayene_sonuc ile aynı, sonda vaka (hayvan → vaka: tohumlama_kaydet); ek olarak HT_VAKA_UYUMSUZ.
+-- Hayvan satırı FOR NO KEY UPDATE: FOR UPDATE, vakayı kilitleyip FK KEY SHARE alan RPC'lerle deadlock üretir (tests/sql/hayvan_takip_kilit_test.sh K3).
 -- Vaka aktifliği: cases.status = 'active' (_vaka_ac_tek tanımı; CHECK yalnız active|closed).
 -- ROLLBACK: DROP FUNCTION public.hayvan_takip_muayene_vaka(uuid, uuid, text); islem_log satırları kalır.
 
@@ -34,7 +35,7 @@ BEGIN
 
   PERFORM 1 FROM public.hayvanlar
     WHERE id = (SELECT t.hayvan_id FROM public.hayvan_takip t WHERE t.id = v_gorev.ref_takip_id)
-    FOR UPDATE;
+    FOR NO KEY UPDATE;
   SELECT * INTO v_takip FROM public.hayvan_takip WHERE id = v_gorev.ref_takip_id FOR UPDATE;
   SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id FOR UPDATE;
 
@@ -44,8 +45,11 @@ BEGIN
   IF v_takip.kapanis_tarihi IS NOT NULL THEN
     RAISE EXCEPTION 'HT_TAKIP_KAPALI';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.cases c
-                  WHERE c.id = p_case_id AND c.animal_id = v_takip.hayvan_id AND c.status = 'active') THEN
+  -- Paylaşımlı kilit: bağ bitene kadar vaka kapanamaz; kapanış bekliyorsa bu sorgu kapanmış satırı görür.
+  PERFORM 1 FROM public.cases c
+    WHERE c.id = p_case_id AND c.animal_id = v_takip.hayvan_id AND c.status = 'active'
+    FOR SHARE;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'HT_VAKA_UYUMSUZ';
   END IF;
 
