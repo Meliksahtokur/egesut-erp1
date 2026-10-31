@@ -95,6 +95,8 @@ function closeM(id) {
   if (history.state?.modal === id) { globalThis._modalBackGuard = true; history.back(); }
   // Kızgınlık Tedavi işareti de her kapanışta düşer; kalırsa sonraki elle vakanın takip sorusu susar (§20.5).
   if (id === 'm-disease') globalThis._kizginlikTedaviId = null;
+  // Muayene→vaka bağlamı form kapanınca düşer: vazgeçilen bağlam sonraki vakaya bağlanmasın. submitCase kapanıştan önce okur.
+  if (id === 'm-disease') globalThis._htMuayeneVaka = null;
   // Planlı tohumlama bayrağını HER kapanış yolunda bırak (overlay, X, ESC, geri tuşu).
   // Aksi halde bayrak takılı kalır ve bir sonraki NORMAL tohumlama, kapanmış bir
   // planlı göreve yazılmaya çalışılır.

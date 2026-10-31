@@ -510,6 +510,7 @@ const RPC_TABLES = {
   hayvan_takip_kapat:          ['hayvan_takip','gorev_log','islem_log'],
   hayvan_takip_muayene_planla: ['hayvan_takip','gorev_log','islem_log'],
   hayvan_takip_muayene_sonuc:  ['hayvan_takip','gorev_log','islem_log'],
+  hayvan_takip_muayene_vaka:   ['hayvan_takip','gorev_log','islem_log'],
 };
 
 // ── OFFLINE REPLAY RPC EŞLEMESİ (Faz 4 — TEK KAYNAK) ─────────────────────

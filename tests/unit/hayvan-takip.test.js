@@ -11,7 +11,8 @@ const { fmtTarih, getDisplayKupe, kuceDogalKarsilastir } = require('../../js/uti
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const RPC_MIGRATION = 'supabase/migrations/20261031200002_hayvan_takip_rpc.sql';
 const ETIKET_MIGRATION = 'supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql';
-const RPC_LERI = ['hayvan_takip_ac', 'hayvan_takip_kapat', 'hayvan_takip_muayene_planla', 'hayvan_takip_muayene_sonuc'];
+const VAKA_MIGRATION = 'supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql';
+const RPC_LERI = ['hayvan_takip_ac', 'hayvan_takip_kapat', 'hayvan_takip_muayene_planla', 'hayvan_takip_muayene_sonuc', 'hayvan_takip_muayene_vaka'];
 
 // helpers.js esc()'inin saf aynası (ui-pure.test.js deseni; asıl esc DOM ister).
 const escMirror = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -339,6 +340,37 @@ test('HT-S-11: api.js haritaları hayvan_takip içerir, RPC_MAP yeni RPC taşım
   }
   const haritaMetni = JSON.stringify(exposed.RPC_MAP);
   for (const r of RPC_LERI) assert.ok(!haritaMetni.includes(r), `${r} RPC_MAP'te olmamalı`);
+});
+
+test('HT-S-20: muayene_vaka sırası görev tamam → log VAKA → kapanış; önceki migration değişmeden yalnız yeni fonksiyon', () => {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, VAKA_MIGRATION), 'utf8').replace(/^--.*$/gm, '');
+  const sira = ['UPDATE public.gorev_log SET tamamlandi = true', 'INSERT INTO public.islem_log', "public._hayvan_takip_kapat_ic(v_takip.id, 'VAKA', v_kullanici, p_not, p_case_id)"].map(x => sql.indexOf(x));
+  assert.ok(sira.every(x => x > 0), 'adımlar: ' + sira);
+  assert.deepStrictEqual(sira, [...sira].sort((a, b) => a - b), 'sıra');
+  assert.strictEqual((sql.match(/\b(CREATE|ALTER|DROP)\b/g) || []).length, 1, 'tek DDL');
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.hayvan_takip_muayene_vaka\(uuid, uuid, text\) FROM PUBLIC, anon, authenticated;/);
+});
+
+test('HT-S-21: htAktifVakaHtml yalnız bu hayvanın aktif vakaları, yeni başlangıç üstte; hastalık ve tarih kaçışlı; yoksa boş', () => {
+  const { htAktifVakaHtml } = ht().sandbox;
+  const vakalar = [
+    { id: 'c1', animal_id: 'H1', disease_id: 'd1', status: 'active', start_date: '2026-10-01' },
+    { id: 'c2"><x', animal_id: 'H1', disease_id: 'd2', status: 'active', start_date: '2026-10-20' },
+    { id: 'c3', animal_id: 'H1', disease_id: 'd1', status: 'closed', start_date: '2026-10-25' },
+    { id: 'c4', animal_id: 'H2', disease_id: 'd1', status: 'active', start_date: '2026-10-26' },
+    { id: 'c5', animal_id: 'H1', disease_id: 'yok', status: 'active', start_date: '2026-09-01' },
+  ];
+  const html = htAktifVakaHtml(vakalar, [{ id: 'd1', name: 'Mastitis' }, { id: 'd2', name: '<b>Metrit</b>' }], 'H1');
+  const kimlikler = [...html.matchAll(/data-action="ht-so-vaka-bagla" data-case-id="([^"]*)"/g)].map(m => m[1]);
+  assert.deepStrictEqual(kimlikler, ['c2&quot;&gt;&lt;x', 'c1', 'c5']);
+  assert.strictEqual((html.match(/Bu vakaya bağla/g) || []).length, 3);
+  assert.ok(html.includes('&lt;b&gt;Metrit&lt;/b&gt; · 20.10.2026'), html);
+  assert.ok(html.includes('Mastitis · 01.10.2026'), html);
+  assert.ok(!html.includes('<b>Metrit'), 'kaçış');
+  assert.ok(html.indexOf('Metrit') < html.indexOf('Mastitis'), 'yeni üstte');
+  assert.ok(html.includes('? · 01.09.2026'), 'kayıp hastalık satırı gizlenmez');
+  assert.strictEqual(htAktifVakaHtml(vakalar, [], 'H9'), '');
+  assert.strictEqual(htAktifVakaHtml(null, null, 'H1'), '');
 });
 
 test('HT-S-11b: fetcher tabloyu tümüyle çeker, tarih aralığı yok', () => {

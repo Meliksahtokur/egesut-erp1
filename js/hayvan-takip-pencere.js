@@ -4,14 +4,15 @@
 // Kart tazelemesinin tek yolu pullTables → _detAciksaTazele; burada openDet çağrılmaz.
 // Çağrı anında kullanılan globaller: helpers.js (g, cl, esc, escAttr, bugun, toast,
 // getDisplayKupe), modal.js (openM, closeM), state.js (getState), api.js (rpc, pullTables,
-// idbGetAll), ui.js (loadDash, loadTasks), app.js (_curTaskFilter), config.js,
-// hayvan-takip.js (ht* yardımcıları).
+// idbGetAll), ui.js (loadDash, loadTasks, openMWithHayvan), app.js (_curTaskFilter), config.js,
+// hayvan-takip.js (ht* yardımcıları), forms.js (_htVakaSonrasiGuvenli).
 // ═══════════════════════════════════════════════════════
 
 const HT_TAZELEME_TABLOLARI = ['hayvan_takip', 'gorev_log', 'islem_log'];
 // Ekrandaki veri bayat demektir: uyarı + pencere kapanır + liste tazelenir (spec §6).
 const HT_BAYAT_VERI = /\bHT_(HAYVAN_AKTIF_DEGIL|TAKIP_KAPALI|TAKIP_YOK|GOREV_KAPALI|GOREV_YOK)\b/;
 let _htKapatBaglam = null; // { baglam:'kart'|'vaka', caseId } — htKapatPencere yazar, htKapatGonder okur
+let _htSonucHayvanId = null; // htSonucAc yazar, htSonucVakaAc ve htVakaBagla okur
 
 /**
  * Çevrimdışıysa uyarır (spec §6: uyarı çıkar, RPC çağrılmaz).
@@ -92,10 +93,11 @@ async function _htTazele(tablolar = HT_TAZELEME_TABLOLARI) {
  * @param {Object} params RPC parametreleri.
  * @param {function(Object):string} basariMetni Sonuçtan başarı toast'u; boşsa toast yok.
  * @param {string} [hataOnek] Hata metninin önüne eklenen bağlam.
+ * @param {function():Promise<void>} [basariSonrasi] Başarıda, tazelemeden önce koşar.
  * @returns {Promise<void>}
- * @rpc hayvan_takip_ac, hayvan_takip_kapat, hayvan_takip_muayene_planla, hayvan_takip_muayene_sonuc
+ * @rpc hayvan_takip_ac, hayvan_takip_kapat, hayvan_takip_muayene_planla, hayvan_takip_muayene_sonuc, hayvan_takip_muayene_vaka
  */
-async function _htGonder(btn, modalId, ad, params, basariMetni, hataOnek = '') {
+async function _htGonder(btn, modalId, ad, params, basariMetni, hataOnek = '', basariSonrasi = null) {
   // Bütün düğmeler kilitlenir: sonuç penceresinde SURSUN yoldayken KAPANSIN ikinci RPC olurdu.
   const dugmeler = [...g(modalId).querySelectorAll('button')];
   const kilit = acik => dugmeler.concat(btn || []).forEach(d => { d.disabled = !acik; });
@@ -121,6 +123,7 @@ async function _htGonder(btn, modalId, ad, params, basariMetni, hataOnek = '') {
   closeM(modalId);
   const metin = basariMetni(sonuc);
   if (metin) toast(metin);
+  if (basariSonrasi) await basariSonrasi();
   await _htTazele();
 }
 
@@ -267,13 +270,87 @@ async function htSonucAc(gorevId) {
     return false;
   }
   const takip = (await idbGetAll('hayvan_takip')).find(t => t.id === gorev.ref_takip_id);
+  _htSonucHayvanId = gorev.hayvan_id;
   g('ht-so-gid').value = gorevId;
   g('ht-so-title').textContent = `🔍 Muayene sonucu — ${_htKupe(gorev.hayvan_id)}`;
   g('ht-so-bilgi').textContent = takip ? `📌 ${htSebepEtiket(takip)}` : (gorev.aciklama || '');
   ['ht-so-saat', 'ht-so-not'].forEach(cl);
   _htPencereAc('m-ht-sonuc', 'ht-so-tarih');
   g('ht-so-tarih').value = htVarsayilanSonrakiTarih(bugun());
+  _htAktifVakalariGoster(gorevId, gorev.hayvan_id);
   return true;
+}
+
+/**
+ * Aktif vaka bölümünü doldurur. Pencereyi bekletmez (await edilmez); yerel okuma hatasında bölüm gizli kalır.
+ * @param {string} gorevId Pencerenin görevi; geç gelen okuma başka göreve yazmaz.
+ * @param {string} hayvanId Hayvan kimliği.
+ * @returns {Promise<void>}
+ * @tablo cases (yerel), diseases (yerel)
+ */
+async function _htAktifVakalariGoster(gorevId, hayvanId) {
+  const kutu = g('ht-so-vakalar');
+  kutu.innerHTML = '';
+  kutu.style.display = 'none';
+  try {
+    const [vakalar, hastaliklar] = await Promise.all([idbGetAll('cases'), idbGetAll('diseases')]);
+    if (g('ht-so-gid').value !== gorevId) return;
+    kutu.innerHTML = htAktifVakaHtml(vakalar, hastaliklar, hayvanId);
+    kutu.style.display = kutu.innerHTML ? '' : 'none';
+  } catch (e) {
+    console.warn('⚠️ Aktif vaka listesi okunamadı:', e);
+  }
+}
+
+/**
+ * Yeni vaka yolu: bağlamı yazar, sonuç penceresini kapatıp vaka formunu açar. Yazma burada yok;
+ * bağlam m-disease kapanınca düşer (closeM), bağ vaka açıldıktan sonra kurulur (_vakaSonrasiAkis).
+ * @returns {void}
+ */
+function htSonucVakaAc() {
+  globalThis._kizginlikTedaviId = null;
+  globalThis._htMuayeneVaka = { gorevId: g('ht-so-gid').value, hayvanId: _htSonucHayvanId, not: g('ht-so-not').value.trim() || null };
+  closeM('m-ht-sonuc');
+  openMWithHayvan('m-disease', 'd-hid', _htKupe(_htSonucHayvanId));
+}
+
+/**
+ * Mevcut vaka yolu: muayeneyi seçilen aktif vakaya bağlar, yeni vaka açılmaz. Başarıda kalan takipler sorulur.
+ * @param {HTMLElement} btn Satırdaki düğme; data-case-id taşır.
+ * @returns {Promise<void>}
+ * @rpc hayvan_takip_muayene_vaka
+ */
+async function htVakaBagla(btn) {
+  if (!_htCevrimici()) return;
+  const caseId = btn.dataset.caseId;
+  const hayvanId = _htSonucHayvanId;
+  await _htGonder(btn, 'm-ht-sonuc', 'hayvan_takip_muayene_vaka', {
+    p_gorev_id: g('ht-so-gid').value,
+    p_case_id: caseId,
+    p_not: g('ht-so-not').value.trim() || null,
+  }, () => '🔗 Vakaya bağlandı, takip kapandı', '', () => _htVakaSonrasiGuvenli(hayvanId, caseId));
+}
+
+/**
+ * Yeni vakayı muayene görevine bağlar. Vaka kayıtlıdır: hata yalnız uyarıdır, fırlatmaz, akış sürer.
+ * Görev ya da takip başkası tarafından kapatıldıysa uyarı yok, yalnız tazelenir.
+ * @param {{gorevId:string, not:?string}} baglam submitCase'in closeM'den önce okuduğu bağlam.
+ * @param {string} caseId Yeni vakanın kimliği.
+ * @returns {Promise<void>}
+ * @rpc hayvan_takip_muayene_vaka
+ */
+async function htMuayeneVakaBagla(baglam, caseId) {
+  try {
+    await rpc('hayvan_takip_muayene_vaka', { p_gorev_id: baglam.gorevId, p_case_id: caseId, p_not: baglam.not });
+    toast('🔗 Vakaya bağlandı, takip kapandı');
+  } catch (e) {
+    console.warn('⚠️ Muayene vakaya bağlanamadı:', e);
+    if (!/\bHT_(GOREV|TAKIP)_KAPALI\b/.test(e?.message || String(e))) {
+      toast('⚠️ Vaka kayıtlı, takip bağlanamadı', true);
+      return;
+    }
+  }
+  await _htTazele();
 }
 
 /**

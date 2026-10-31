@@ -758,9 +758,9 @@ p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarm
 
 ---
 
-## Hayvan Takip (migrations 20261031200001-000004; domain-rules §20)
+## Hayvan Takip (migrations 20261031200001-000005; domain-rules §20)
 
-Migration dosyalarından yazıldı, canlı gövde kanıtı değildir; prod apply sahip kapısında. Dördü de SECURITY DEFINER; EXECUTE `authenticated, service_role`. Tablo `hayvan_takip`te `authenticated`
+Migration dosyalarından yazıldı, canlı gövde kanıtı değildir; prod apply sahip kapısında. Beşi de SECURITY DEFINER; EXECUTE `authenticated, service_role`. Tablo `hayvan_takip`te `authenticated`
 yalnız SELECT alır, yazma bu RPC'lerden. Hepsi online-only: `RPC_TABLES`'ta var, `RPC_MAP`'te bilerek yok.
 Çağrı: `js/hayvan-takip-pencere.js` `_htGonder`. Kilit sırası: hayvanlar → hayvan_takip → gorev_log.
 Hatalar düz metin `RAISE EXCEPTION`; ret sırası parametre → varlık → durum, kodlar aşağıda bu sıradadır.
@@ -784,6 +784,13 @@ Hatalar düz metin `RAISE EXCEPTION`; ret sırası parametre → varlık → dur
   `HT_GOREV_TIP_UYUMSUZ`, `HT_TAKIP_YOK` (`ref_takip_id` boş), `HT_GOREV_KAPALI`, `HT_TAKIP_KAPALI`.
 → Görevi `gorev_tamamla`'ya gitmeden doğrudan tamamlar. Log `HAYVAN_TAKIP_MUAYENE`. KAPANSIN takibi `MUAYENE` nedeniyle kapatır;
   SURSUN'da boş tarih yeni görev açmaz. Kilitli `gorev_tamamla` guard'ı için bkz. Görev Sistemi.
+
+**`hayvan_takip_muayene_vaka(p_gorev_id uuid, p_case_id uuid, p_not text?)`** → jsonb `{ok, sonuc:'VAKA', takip_id, case_id, kapandi}`
+→ Ret: `HT_GOREV_YOK`, `HT_GOREV_TIP_UYUMSUZ`, `HT_TAKIP_YOK` (`ref_takip_id` boş), `HT_GOREV_KAPALI`, `HT_TAKIP_KAPALI`,
+  `HT_VAKA_UYUMSUZ` (vaka bu hayvanın değil, yok ya da `cases.status <> 'active'`). Kilit sırası `muayene_sonuc` ile aynı.
+→ Sıra zorunlu, tek işlem: görev `tamamlandi` → log `HAYVAN_TAKIP_MUAYENE` (`snapshot.sonuc='VAKA'`, `kapatan_vaka_id`) → `_hayvan_takip_kapat_ic(takip,'VAKA',…)`. Yoksa görev iptal görünür.
+→ Yalnız bu görevin takibini kapatır; diğer takipler `hayvan_takip_kapat` ile sorulur. Vaka açmaz: yeni vaka yolunda `create_case` önce, ayrı işlemde koşar (`_vakaSonrasiAkis`), bağ hatasında vaka kalır.
+  Çağrı: `htMuayeneVakaBagla` (yeni vaka), `htVakaBagla` (mevcut aktif vaka).
 
 **Kapanış ortak yolu** `_hayvan_takip_kapat_ic` (iç yardımcı, EXECUTE yok): açık görevi `iptal=true, kapatan_ref='hayvan-takip-kapandi'` yapar, takip başına bir
 `HAYVAN_TAKIP_KAPANDI` yazar. **Çıkış:** `trg_hayvan_cikis_takip_kapat` (`hayvanlar`, Aktif'ten çıkışta) nedeni `CIKIS`, kapatan `sistem`.

@@ -22,6 +22,7 @@ write_manifest:
   - supabase/migrations/20261031200002_hayvan_takip_rpc.sql
   - supabase/migrations/20261031200003_gorev_tamamla_hayvan_takip.sql
   - supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql
+  - supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql
   - tests/db-validation/hayvan_takip_priors.sql
   - tests/sql/hayvan_takip_kos.sh
   - tests/sql/hayvan_takip_karsi_test.sql
@@ -32,6 +33,7 @@ write_manifest:
   - js/hayvan-takip.js
   - js/hayvan-takip-pencere.js
   - js/utils/handlers.js
+  - js/utils/modal.js
   - js/gecmis.js
   - js/degisiklikler/etiketler.js
   - js/ui.js
@@ -114,6 +116,7 @@ checkpoint:
   - F5: `js/forms.js`, `tests/unit/hayvan-takip-vaka.test.js`
   - D1: `.harness/references/rpc-reference.md`, `.harness/references/ui-map.md`
   - U2-G0: `supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql` (diğer dosyalar yukarıdaki düğümlerde)
+  - U2-M1: `supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql`, `js/utils/modal.js` (diğer dosyalar yukarıdaki düğümlerde)
   - Plan ve kapanış: `docs/plans/2026-10-31-hayvan-takip-PLAN.md`, bu goal dosyası, `.harness/reports/2026-10-31-hayvan-takip.md`
   - Yerel: `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`
 - **tracked paths:** yukarıdaki manifestin `runs/` ve `.crumbs/` dışındaki dosyaları. `docs/plans/` gitignore'dadır, `git add -f` ile eklenir.

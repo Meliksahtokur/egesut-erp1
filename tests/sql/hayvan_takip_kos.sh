@@ -11,7 +11,7 @@ if [ "$#" -eq 0 ]; then
   m="$kok/supabase/migrations"
   set -- "$m/20261031200001_hayvan_takip_sema.sql" "$m/20261031200002_hayvan_takip_rpc.sql" \
     "$m/20261031200003_gorev_tamamla_hayvan_takip.sql" "$m/20261031200004_hayvan_takip_halsizlik_etiket.sql" \
-    "$kok/tests/sql/hayvan_takip_test.sql"
+    "$m/20261031200005_hayvan_takip_muayene_vaka.sql" "$kok/tests/sql/hayvan_takip_test.sql"
 fi
 
 if [ "${KOS_MOD:-}" = topla ]; then

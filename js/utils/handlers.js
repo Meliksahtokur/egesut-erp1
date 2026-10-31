@@ -235,6 +235,8 @@ registerActions({
   'ht-acik-kalsin':  () => htAcikKalsin(),
   'ht-so-gonder':    (el) => htSonucGonder(el),
   'ht-so-iptal':     () => closeM('m-ht-sonuc'),
+  'ht-so-vaka-ac':   () => htSonucVakaAc(),
+  'ht-so-vaka-bagla': (el) => htVakaBagla(el),
   'close-cikis':     () => closeM('m-cikis'),
   'close-gebelik':   () => closeM('m-gebelik'),
   'close-confirm':   () => closeM('m-confirm'),

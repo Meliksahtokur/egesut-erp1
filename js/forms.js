@@ -799,6 +799,10 @@ async function submitCase(btn) {
   const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
+  // Muayene sonucundan açıldıysa bağlam (§20.6): closeM siler, kapanıştan önce oku. d-hid düzenlenebilir; kızgınlık bağlam taşımaz.
+  const htMuayene = globalThis._kizginlikTedaviId ? null : globalThis._htMuayeneVaka;
+  if (htMuayene && hayvan.id !== htMuayene.hayvanId) { toast('⚠️ Bu vaka muayene edilen hayvana açılmalı', true); return; }
+
   // cila2 C1: kısır + OVSYNC-aile hastalığı → istemcide engelle (DB 000018 aynası)
   if (hayvan.kisir) {
     const ovsyncIds = await _ovsyncAileHastalikIdSet();
@@ -859,7 +863,7 @@ async function submitCase(btn) {
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
       await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
-      await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id), !!kizginlikKayitId);
+      await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id), !!kizginlikKayitId, htMuayene);
     }
   } catch (e) {
     // P10: elle vaka aç yolu (create_case) TAKIP_ACIK kapısından geçer (P3b) —
@@ -895,7 +899,7 @@ async function submitCase(btn) {
       await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(() => {});
       if (res2?.case_id) {
         await openDet(hayvan.id);
-        await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id), !!kizginlikKayitId);
+        await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id), !!kizginlikKayitId, htMuayene);
       }
       return res2;
     };
@@ -911,9 +915,10 @@ async function _htVakaSonrasiGuvenli(hayvanId, caseId) {
   catch (e) { console.warn('⚠️ Vaka sonrası takip penceresi:', e); toast('⚠️ Vaka kayıtlı, takip penceresi açılamadı', true); }
 }
 
-/** Vaka detayı bitince takibi sorar: pencere üstte kalır; detay hatası kayıtlı vakaya hata göstermez. */
-async function _vakaSonrasiAkis(hayvanId, caseId, detayAc, kizginliktan) {
+/** Vaka detayı bitince muayene bağlanır, takip sorulur: pencere üstte kalır; detay hatası kayıtlı vakaya hata göstermez. */
+async function _vakaSonrasiAkis(hayvanId, caseId, detayAc, kizginliktan, muayene) {
   try { await detayAc(); } catch (e) { console.warn('⚠️ Vaka detayı açılamadı:', e); }
+  if (muayene) await htMuayeneVakaBagla(muayene, caseId);
   if (!kizginliktan) await _htVakaSonrasiGuvenli(hayvanId, caseId);
 }
 

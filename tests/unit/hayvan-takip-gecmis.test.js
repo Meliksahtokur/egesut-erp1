@@ -97,6 +97,7 @@ test('HT-GM-04: gmHtIslemAlt not, sebep etiketi ve sonucu ham metin verir', () =
   assert.ok(sursun.includes('Takip sürsün'), sursun);
   assert.ok(sursun.includes('tırnak bakıldı'), sursun);
   assert.ok(alt('HAYVAN_TAKIP_MUAYENE', { sebep_kodu: 'TOPALLIK', sonuc: 'KAPANSIN' }, null).includes('Takip kapansın'));
+  assert.strictEqual(alt('HAYVAN_TAKIP_MUAYENE', { sebep_kodu: 'TOPALLIK', sonuc: 'VAKA' }, 'tedaviye alındı'), 'Topallık · Vakaya bağlandı · tedaviye alındı');
 
   // Not yoksa boşluk ya da ayraç artığı kalmaz; bilinmeyen sonuç uydurulmaz.
   assert.strictEqual(alt('HAYVAN_TAKIP_KAPANDI', { sebep_kodu: 'SUT_DUSUSU' }, '  '), 'Süt düşüşü');

@@ -133,7 +133,7 @@ const _GM_KOD_DEGER_ETIKET = {
     TAKIP_MUAYENE: 'Takip Muayenesi',   // P9/K15: ovsync takip zinciri muayenesi
     HAYVAN_TAKIP_MUAYENE: 'Hayvan Takip Muayenesi',
   },
-  hayvan_takip_sonuc: { SURSUN: 'Takip sürsün', KAPANSIN: 'Takip kapansın' },
+  hayvan_takip_sonuc: { SURSUN: 'Takip sürsün', KAPANSIN: 'Takip kapansın', VAKA: 'Vakaya bağlandı' },
   durum: { active: 'Aktif', closed: 'Kapandı', geri_alindi: 'Geri Alındı' },
   status: { active: 'Aktif', closed: 'Kapandı' },
 };

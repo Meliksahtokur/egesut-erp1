@@ -166,7 +166,8 @@ BEGIN
     'public.hayvan_takip_ac(text,text,text,date,time)',
     'public.hayvan_takip_kapat(uuid[],text,uuid)',
     'public.hayvan_takip_muayene_planla(uuid,date,time)',
-    'public.hayvan_takip_muayene_sonuc(uuid,text,text,date,time)'] LOOP
+    'public.hayvan_takip_muayene_sonuc(uuid,text,text,date,time)',
+    'public.hayvan_takip_muayene_vaka(uuid,uuid,text)'] LOOP
     PERFORM pg_temp.ht_dogru(NOT has_function_privilege('anon', f, 'EXECUTE'), 'anon EXECUTE var: ' || f);
     PERFORM pg_temp.ht_dogru(has_function_privilege('authenticated', f, 'EXECUTE'), 'authenticated EXECUTE yok: ' || f);
     PERFORM pg_temp.ht_dogru(has_function_privilege('service_role', f, 'EXECUTE'), 'service_role EXECUTE yok: ' || f);
@@ -426,6 +427,93 @@ BEGIN
   PERFORM pg_temp.ht_red('HT_SONUC_GECERSIZ', 'SELECT public.hayvan_takip_muayene_sonuc(%L::uuid, %L)', g::text, 'BELKI');
   PERFORM pg_temp.ht_red('HT_SONUC_GECERSIZ', 'SELECT public.hayvan_takip_muayene_sonuc(%L::uuid, NULL)', g::text);
   PERFORM pg_temp.ht_esit(pg_temp.ht_acik_id(t)::text, g::text, 'görev açık');
+END $t$);
+SELECT pg_temp.ht_test('V01', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun()); g uuid := pg_temp.ht_acik_id(t); c uuid := pg_temp.ht_vaka(h); r jsonb; l record;
+BEGIN
+  r := public.hayvan_takip_muayene_vaka(g, c, 'tedaviye alındı');
+  PERFORM pg_temp.ht_alan(r, 'ok', 'true', 'sonuc', 'VAKA', 'takip_id', t::text, 'case_id', c::text, 'kapandi', 'true');
+  -- Görev iptal değil tamam: sıra yanlışsa _kapat_ic iptal yazardı
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g), 'tamamlandi', 'true', 'iptal', 'false', 'kapatan_ref', NULL);
+  PERFORM pg_temp.ht_dogru(pg_temp.ht_gr(g)->>'tamamlanma_tarihi' IS NOT NULL, 'tamamlanma_tarihi boş');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t), 'kapanis_nedeni', 'VAKA', 'kapatan_vaka_id', c::text, 'kapanis_notu', 'tedaviye alındı', 'kapatan', pg_temp.ht_eposta());
+  PERFORM pg_temp.ht_kayit(t, 'MUAYENE', '1', 'KAPANDI', '1');
+  SELECT kullanici_notu, snapshot INTO l FROM public.islem_log WHERE tip = 'HAYVAN_TAKIP_MUAYENE' AND ref_id = t::text;
+  PERFORM pg_temp.ht_esit(l.kullanici_notu, 'tedaviye alındı', 'log notu');
+  PERFORM pg_temp.ht_alan(l.snapshot, 'sonuc', 'VAKA', 'gorev_id', g::text, 'kapatan_vaka_id', c::text, 'sebep_kodu', 'TOPALLIK', 'kullanici', pg_temp.ht_eposta());
+  PERFORM pg_temp.ht_esit(pg_temp.ht_acik(t)::text, '0', 'açık görev');
+END $t$);
+SELECT pg_temp.ht_test('V02', $t$ DECLARE h text := pg_temp.ht_hayvan(1); c uuid := pg_temp.ht_vaka(h); d uuid := pg_temp.ht_gorev(h, 'E2E_HT_DUZ'); rs uuid := pg_temp.ht_gorev(h, 'HAYVAN_TAKIP_MUAYENE'); s constant text := 'SELECT public.hayvan_takip_muayene_vaka(%L::uuid, %L::uuid)';
+BEGIN
+  PERFORM pg_temp.ht_red('HT_GOREV_YOK', s, pg_temp.ht_id(99)::text, c::text);
+  PERFORM pg_temp.ht_red('HT_GOREV_TIP_UYUMSUZ', s, d::text, c::text);
+  PERFORM pg_temp.ht_red('HT_TAKIP_YOK', s, rs::text, c::text);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(d), 'tamamlandi', 'false');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(rs), 'tamamlandi', 'false');
+END $t$);
+SELECT pg_temp.ht_test('V03', $t$ DECLARE h text := pg_temp.ht_hayvan(1); c uuid := pg_temp.ht_vaka(h); t uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun()); g uuid := pg_temp.ht_acik_id(t);
+  t2 uuid := pg_temp.ht_ac(h, 'ZAYIFLAMA', NULL, pg_temp.ht_gun()); g2 uuid := pg_temp.ht_acik_id(t2);
+  t3 uuid := pg_temp.ht_ac(h, 'ISTAHSIZLIK', NULL, pg_temp.ht_gun()); g3 uuid := pg_temp.ht_acik_id(t3); s constant text := 'SELECT public.hayvan_takip_muayene_vaka(%L::uuid, %L::uuid)';
+BEGIN
+  -- Tamamlanmış görev: ikinci çağrı dahil; iptal görev
+  PERFORM public.hayvan_takip_muayene_sonuc(g, 'SURSUN');
+  PERFORM pg_temp.ht_red('HT_GOREV_KAPALI', s, g::text, c::text);
+  UPDATE public.gorev_log SET iptal = true WHERE id = g2;
+  PERFORM pg_temp.ht_red('HT_GOREV_KAPALI', s, g2::text, c::text);
+  -- Görev açık, takip kapalı (RPC dışı kurulan tutarsızlık, §20.9)
+  UPDATE public.hayvan_takip SET kapanis_tarihi = now(), kapanis_nedeni = 'ELLE' WHERE id = t3;
+  PERFORM pg_temp.ht_red('HT_TAKIP_KAPALI', s, g3::text, c::text);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g3), 'tamamlandi', 'false');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t3), 'kapanis_nedeni', 'ELLE', 'kapatan_vaka_id', NULL);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t), 'kapanis_tarihi', NULL);
+  PERFORM pg_temp.ht_kayit(t3, 'MUAYENE', '0');
+END $t$);
+SELECT pg_temp.ht_test('V04', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun()); g uuid := pg_temp.ht_acik_id(t);
+  baska uuid := pg_temp.ht_vaka(pg_temp.ht_hayvan(2)); kapali uuid := pg_temp.ht_vaka(h); s constant text := 'SELECT public.hayvan_takip_muayene_vaka(%L::uuid, %L::uuid)';
+BEGIN
+  UPDATE public.cases SET status = 'closed', closed_at = now() WHERE id = kapali;
+  PERFORM pg_temp.ht_red('HT_VAKA_UYUMSUZ', s, g::text, baska::text);
+  PERFORM pg_temp.ht_red('HT_VAKA_UYUMSUZ', s, g::text, kapali::text);
+  PERFORM pg_temp.ht_red('HT_VAKA_UYUMSUZ', s, g::text, pg_temp.ht_id(99)::text);
+  PERFORM pg_temp.ht_red('HT_VAKA_UYUMSUZ', 'SELECT public.hayvan_takip_muayene_vaka(%L::uuid, NULL::uuid)', g::text);
+  -- Hiçbir ret iz bırakmaz
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g), 'tamamlandi', 'false', 'iptal', 'false');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t), 'kapanis_tarihi', NULL);
+  PERFORM pg_temp.ht_kayit(t, 'MUAYENE', '0', 'KAPANDI', '0');
+END $t$);
+-- K6: yalnız muayenesi yapılan takip kapanır; diğer takip ve görevi sorulana kadar açık kalır. Mevcut vakaya ikinci takip de bağlanabilir.
+SELECT pg_temp.ht_test('V05', $t$ DECLARE h text := pg_temp.ht_hayvan(1); c uuid := pg_temp.ht_vaka(h);
+  t uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun()); g uuid := pg_temp.ht_acik_id(t);
+  t2 uuid := pg_temp.ht_ac(h, 'ZAYIFLAMA', NULL, pg_temp.ht_gun() + 1); g2 uuid := pg_temp.ht_acik_id(t2);
+BEGIN
+  PERFORM public.hayvan_takip_muayene_vaka(g, c);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t2), 'kapanis_tarihi', NULL);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g2), 'tamamlandi', 'false', 'iptal', 'false');
+  PERFORM pg_temp.ht_kayit(t2, 'MUAYENE', '0', 'KAPANDI', '0');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t), 'kapanis_notu', NULL);
+  PERFORM public.hayvan_takip_muayene_vaka(g2, c);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t2), 'kapanis_nedeni', 'VAKA', 'kapatan_vaka_id', c::text);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g2), 'tamamlandi', 'true', 'iptal', 'false');
+END $t$);
+-- Yol A zinciri: create_case açık HAYVAN_TAKIP_MUAYENE görevini görmez (TAKIP_ACIK yok), sonra bağ kurulur.
+SELECT pg_temp.ht_test('V07', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun()); g uuid := pg_temp.ht_acik_id(t); r jsonb;
+BEGIN
+  r := public.create_case(h, (SELECT id FROM public.diseases ORDER BY id LIMIT 1), 'E2E-HT-T', false);
+  PERFORM pg_temp.ht_alan(r, 'ok', 'true');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g), 'tamamlandi', 'false', 'iptal', 'false');
+  PERFORM public.hayvan_takip_muayene_vaka(g, (r->>'case_id')::uuid);
+  PERFORM pg_temp.ht_alan(pg_temp.ht_tk(t), 'kapanis_nedeni', 'VAKA', 'kapatan_vaka_id', r->>'case_id');
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(g), 'tamamlandi', 'true', 'iptal', 'false');
+END $t$);
+-- ACL: PUBLIC ve anon yok. proacl NULL varsayılan PUBLIC EXECUTE demektir, ayrı ölçülür.
+SELECT pg_temp.ht_test('V06', $t$ DECLARE f constant regprocedure := 'public.hayvan_takip_muayene_vaka(uuid,uuid,text)'::regprocedure; p record;
+BEGIN
+  SELECT prosecdef, proacl, proconfig INTO p FROM pg_proc WHERE oid = f;
+  PERFORM pg_temp.ht_dogru(p.proacl IS NOT NULL, 'proacl NULL: PUBLIC EXECUTE varsayılan');
+  PERFORM pg_temp.ht_dogru(NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0), 'PUBLIC EXECUTE var');
+  PERFORM pg_temp.ht_dogru(NOT has_function_privilege('anon', f, 'EXECUTE'), 'anon EXECUTE var');
+  PERFORM pg_temp.ht_dogru(has_function_privilege('authenticated', f, 'EXECUTE'), 'authenticated EXECUTE yok');
+  PERFORM pg_temp.ht_dogru(p.prosecdef, 'DEFINER değil');
+  PERFORM pg_temp.ht_dogru('search_path=public, pg_temp' = ANY (p.proconfig), 'search_path sabit değil');
 END $t$);
 SELECT pg_temp.ht_test('C01', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t1 uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun() + 1); g uuid := pg_temp.ht_acik_id(t1);
   t2 uuid := pg_temp.ht_ac(h, 'ZAYIFLAMA'); t3 uuid := pg_temp.ht_ac(h, 'ISTAHSIZLIK'); x uuid; r jsonb;

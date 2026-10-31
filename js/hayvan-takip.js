@@ -14,7 +14,7 @@ const HT_HATA_METINLERI = {
   GECMIS_TARIH: 'Muayene tarihi geçmişte olamaz.',
   BOS_LISTE: 'Kapatılacak takip seçilmedi.',
   FARKLI_HAYVAN: 'Takipler aynı hayvana ait olmalı.',
-  VAKA_UYUMSUZ: 'Vaka bu hayvana ait değil.',
+  VAKA_UYUMSUZ: 'Vaka bu hayvana ait değil ya da kapanmış.',
   TAKIP_YOK: 'Takip bulunamadı.',
   TAKIP_KAPALI: 'Bu takip kapanmış.',
   GOREV_YOK: 'Muayene görevi bulunamadı.',
@@ -149,6 +149,25 @@ function htKartBlokHtml(acikTakipler, gorevler) {
  */
 function htKapatOnSecim(acikTakipler, baglam) {
   return baglam === 'kart' && acikTakipler?.length === 1 ? [acikTakipler[0].id] : [];
+}
+
+/**
+ * Sonuç penceresinin "mevcut vakaya bağla" bölümünü üretir: hayvanın bütün aktif vakaları,
+ * yeni başlayan üstte. Kimlik data özniteliğine yazılır.
+ * @param {Array} vakalar cases satırları.
+ * @param {Array} hastaliklar diseases satırları.
+ * @param {string} hayvanId Hayvan kimliği.
+ * @returns {string} Bölüm HTML'i; aktif vaka yoksa boş metin.
+ */
+function htAktifVakaHtml(vakalar, hastaliklar, hayvanId) {
+  const aktif = (vakalar || []).filter(c => c.animal_id === hayvanId && c.status === 'active')
+    .sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
+  if (!aktif.length) return '';
+  const satirlar = aktif.map(c => {
+    const ad = (hastaliklar || []).find(d => d.id === c.disease_id)?.name || '?';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;font-size:.82rem"><span>🏥 ${esc(ad)} · ${esc(fmtTarih(c.start_date))}</span><button class="btn btn-o" style="flex:none;width:auto;margin:0;padding:6px 10px;font-size:.75rem" data-action="ht-so-vaka-bagla" data-case-id="${escAttr(c.id)}">Bu vakaya bağla</button></div>`;
+  }).join('');
+  return `<label class="flbl">Aktif vakalar</label>${satirlar}`;
 }
 
 /**

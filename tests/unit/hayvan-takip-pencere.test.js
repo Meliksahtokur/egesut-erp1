@@ -67,6 +67,7 @@ function f1() {
     htKapatOnSecim: s.htKapatOnSecim,
     htVarsayilanSonrakiTarih: s.htVarsayilanSonrakiTarih,
     htHataMetni: s.htHataMetni,
+    htAktifVakaHtml: s.htAktifVakaHtml,
   };
 }
 
@@ -75,9 +76,9 @@ function kur(o = {}) {
   const g = id => { if (!els.has(id)) els.set(id, eleman(id)); return els.get(id); };
   const k = {
     g, els,
-    rpcler: [], toastlar: [], pulllar: [], acilan: [], kapanan: [], olay: [],
+    rpcler: [], toastlar: [], pulllar: [], acilan: [], kapanan: [], olay: [], sira: [],
     yuklenenGorev: [], dash: 0, openDet: 0, onLine: o.onLine !== false,
-    idb: { hayvan_takip: o.takipler || [], gorev_log: o.gorevler || [] },
+    idb: { hayvan_takip: o.takipler || [], gorev_log: o.gorevler || [], cases: o.vakalar || [], diseases: o.hastaliklar || [] },
     sayfa: o.sayfa || 'dash',
   };
   const openMAyna = id => {
@@ -109,16 +110,19 @@ function kur(o = {}) {
       pullTables: async t => {
         k.pulllar.push([...t]);
         k.olay.push('pull');
+        k.sira.push('pull');
         if (o.pull) return o.pull(t);
         return { ok: [...t], failed: [] };
       },
-      idbGetAll: async t => k.idb[t] || [],
+      idbGetAll: async t => { if (o.idb) return o.idb(t, k); return k.idb[t] || []; },
       getState: a => (a === 'animals' ? [{ id: 'H1', kupe_no: 'K-1' }] : a === 'currentPage' ? k.sayfa : undefined),
-      loadDash: async () => { k.dash++; k.olay.push('dash'); },
+      loadDash: async () => { k.dash++; k.olay.push('dash'); k.sira.push('dash'); },
       loadTasks: async f => { k.yuklenenGorev.push(f); k.olay.push('tasks'); },
       openDet: () => { k.openDet++; },
       openM: o.gercekOpenM ? openMGercek() : openMAyna,
-      closeM: id => { k.kapanan.push(id); },
+      closeM: id => { k.kapanan.push(id); k.sira.push('closeM:' + id); },
+      openMWithHayvan: (...a) => { k.sira.push(['openMWithHayvan', ...a]); },
+      _htVakaSonrasiGuvenli: async (...a) => { k.sira.push(['soru', ...a]); },
       _curTaskFilter: 'today',
     },
   });
@@ -456,6 +460,162 @@ test('HT-P-10d: HT_GOREV_KAPALI ve HT_GECMIS_TARIH ayrımı: ilki tazeler, ikinc
   assert.deepStrictEqual(b.kapanan, []);
 });
 
+// ── Muayeneden vakaya bağ ────────────────────────────────────
+const dokun = () => new Promise(r => setImmediate(r));
+const vaka = (id, ek = {}) => ({ id, animal_id: 'H1', disease_id: 'd1', status: 'active', start_date: '2026-10-20', ...ek });
+const HASTALIK = [{ id: 'd1', name: 'Mastitis' }, { id: 'd2', name: 'Metrit' }];
+const satirKimlik = k => [...k.g('ht-so-vakalar').innerHTML.matchAll(/data-case-id="([^"]*)"/g)].map(m => m[1]);
+
+test('HT-P-30: Vaka aç bağlamı yazar, kızgınlık işaretini siler, önce sonuç penceresi kapanır, sonra vaka formu açılır; yazma yok', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')] });
+  await k.s.htSonucAc('g1');
+  k.s._kizginlikTedaviId = 'K-1';
+  k.g('ht-so-not').value = ' şişlik ';
+  k.sira.length = 0;
+  k.s.htSonucVakaAc();
+  assert.deepStrictEqual(duz(k.s._htMuayeneVaka), { gorevId: 'g1', hayvanId: 'H1', not: 'şişlik' });
+  assert.strictEqual(k.s._kizginlikTedaviId, null);
+  assert.deepStrictEqual(duz(k.sira), ['closeM:m-ht-sonuc', ['openMWithHayvan', 'm-disease', 'd-hid', 'K-1']]);
+  assert.deepStrictEqual(k.rpcler, []);
+  k.g('ht-so-not').value = '   ';
+  k.s.htSonucVakaAc();
+  assert.strictEqual(k.s._htMuayeneVaka.not, null, 'boş not null');
+});
+
+test('HT-P-31: yalnız hayvanın aktif vakaları listelenir, aynı hastalıkla sınırlı değil; satırda hastalık ve tarih', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], hastaliklar: HASTALIK, vakalar: [
+    vaka('c1'), vaka('c2', { disease_id: 'd2', start_date: '2026-10-25' }), vaka('c3', { status: 'closed' }), vaka('c4', { animal_id: 'H2' }),
+  ] });
+  await k.s.htSonucAc('g1');
+  await dokun();
+  assert.deepStrictEqual(satirKimlik(k), ['c2', 'c1']);
+  assert.strictEqual(k.g('ht-so-vakalar').style.display, '');
+  const html = k.g('ht-so-vakalar').innerHTML;
+  assert.match(html, /Metrit · 25\.10\.2026/);
+  assert.match(html, /Mastitis · 20\.10\.2026/);
+  assert.strictEqual((html.match(/Bu vakaya bağla/g) || []).length, 2);
+});
+
+test('HT-P-32: aktif vaka yoksa bölüm görünmez; önceki açılışın satırı kalmaz', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], hastaliklar: HASTALIK, vakalar: [vaka('c1')] });
+  await k.s.htSonucAc('g1');
+  await dokun();
+  assert.deepStrictEqual(satirKimlik(k), ['c1']);
+  k.idb.cases = [vaka('c1', { status: 'closed' })];
+  await k.s.htSonucAc('g1');
+  assert.strictEqual(k.g('ht-so-vakalar').style.display, 'none', 'okuma bitmeden eski satır görünmez');
+  await dokun();
+  assert.strictEqual(k.g('ht-so-vakalar').style.display, 'none');
+  assert.strictEqual(k.g('ht-so-vakalar').innerHTML, '');
+});
+
+test('HT-P-33: liste htSonucAc\'ı bekletmez: okuma bitmese de pencere açık, true döner', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')],
+    idb: (t, kk) => (t === 'cases' ? new Promise(() => {}) : kk.idb[t] || []) });
+  assert.strictEqual(await k.s.htSonucAc('g1'), true);
+  assert.deepStrictEqual(k.acilan, ['m-ht-sonuc']);
+  assert.strictEqual(k.g('ht-so-vakalar').style.display, 'none');
+});
+
+test('HT-P-34: vaka okunamazsa bölüm görünmez, hata toast\'u yok, pencere açık kalır', async () => {
+  for (const tablo of ['cases', 'diseases']) {
+    const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], vakalar: [vaka('c1')],
+      idb: async (t, kk) => { if (t === tablo) throw new Error('idb'); return kk.idb[t] || []; } });
+    assert.strictEqual(await k.s.htSonucAc('g1'), true);
+    await dokun();
+    assert.strictEqual(k.g('ht-so-vakalar').style.display, 'none', tablo);
+    assert.deepStrictEqual(k.toastlar, [], tablo);
+  }
+});
+
+test('HT-P-35: geç gelen liste başka göreve açılmış pencereye yazılmaz', async () => {
+  let bitir;
+  const bekle = new Promise(r => { bitir = r; });
+  let ilk = true;
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1'), gorev('g2')], vakalar: [vaka('c1')],
+    idb: async (t, kk) => { if (t === 'cases' && ilk) { ilk = false; await bekle; return [vaka('eski')]; } return kk.idb[t] || []; } });
+  await k.s.htSonucAc('g1');
+  await k.s.htSonucAc('g2');
+  await dokun();
+  assert.deepStrictEqual(satirKimlik(k), ['c1']);
+  bitir();
+  await dokun();
+  assert.deepStrictEqual(satirKimlik(k), ['c1'], 'eski satır ezmez');
+});
+
+test('HT-P-36: mevcut vakaya bağ yalnız RPC; pencere kapanır, kalan takipler sorulur, liste tazelenir; vaka açılmaz', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], vakalar: [vaka('c1')] });
+  await k.s.htSonucAc('g1');
+  k.g('ht-so-not').value = ' tedavide ';
+  k.sira.length = 0;
+  await k.s.htVakaBagla(btn({ caseId: 'c1' }));
+  assert.deepStrictEqual(k.rpcler, [{ ad: 'hayvan_takip_muayene_vaka', p: { p_gorev_id: 'g1', p_case_id: 'c1', p_not: 'tedavide' } }]);
+  assert.deepStrictEqual(duz(k.sira), ['closeM:m-ht-sonuc', ['soru', 'H1', 'c1'], 'pull', 'dash']);
+  assert.deepStrictEqual(k.pulllar, [TABLOLAR]);
+  assert.ok(k.toastlar.every(t => !t.e));
+  assert.match(son(k), /Vakaya bağlandı/i);
+  k.g('ht-so-not').value = '';
+  await k.s.htVakaBagla(btn({ caseId: 'c1' }));
+  assert.strictEqual(k.rpcler[1].p.p_not, null);
+});
+
+test('HT-P-37: mevcut vakaya bağ çevrimdışıyken RPC çağırmaz', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')] });
+  await k.s.htSonucAc('g1');
+  k.onLine = false;
+  await k.s.htVakaBagla(btn({ caseId: 'c1' }));
+  assert.deepStrictEqual(k.rpcler, []);
+  assert.match(son(k), /İnternet/);
+  assert.deepStrictEqual(k.kapanan, []);
+});
+
+test('HT-P-38: bağ hatasında soru sorulmaz; uyumsuz vakada pencere açık, bayat kapalıda kapanıp tazeler', async () => {
+  for (const [hata, kapanir, metin] of [['HT_VAKA_UYUMSUZ', false, /ait değil ya da kapanmış/], ['BAGLANTI', false, /JENERIK:BAGLANTI/], ['HT_GOREV_KAPALI', true, /görevi kapanmış/], ['HT_TAKIP_KAPALI', true, /takip kapanmış/]]) {
+    const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], rpc: () => { throw new Error(hata); } });
+    await k.s.htSonucAc('g1');
+    await k.s.htVakaBagla(btn({ caseId: 'c1' }));
+    assert.ok(!k.sira.some(o => o[0] === 'soru'), hata);
+    assert.match(son(k), metin, hata);
+    assert.deepStrictEqual(k.kapanan, kapanir ? ['m-ht-sonuc'] : [], hata);
+    assert.deepStrictEqual(k.pulllar, kapanir ? [TABLOLAR] : [], hata);
+  }
+});
+
+test('HT-P-39: bağ yoldayken bütün düğmeler kilitli; bitince açılır, çift gönderim olmaz', async () => {
+  let kilitliydi = null;
+  const diger = makeElement('button');
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], rpc: () => { kilitliydi = diger.disabled; return { ok: true }; } });
+  await k.s.htSonucAc('g1');
+  k.g('m-ht-sonuc').dugmeler = [diger];
+  const b = btn({ caseId: 'c1' });
+  await k.s.htVakaBagla(b);
+  assert.strictEqual(kilitliydi, true);
+  assert.strictEqual(diger.disabled, false);
+  assert.strictEqual(b.disabled, false);
+});
+
+test('HT-P-40: htMuayeneVakaBagla başarıda tazeler; genel hata metni birebir; bayat kapalı yalnız tazeler; asla fırlatmaz', async () => {
+  const bag = { gorevId: 'g1', hayvanId: 'H1', not: 'n' };
+  const a = kur();
+  await a.s.htMuayeneVakaBagla(bag, 'c1');
+  assert.deepStrictEqual(a.rpcler, [{ ad: 'hayvan_takip_muayene_vaka', p: { p_gorev_id: 'g1', p_case_id: 'c1', p_not: 'n' } }]);
+  assert.deepStrictEqual(a.pulllar, [TABLOLAR]);
+  assert.ok(a.toastlar.every(t => !t.e));
+
+  for (const hata of ['HT_VAKA_UYUMSUZ', 'ag gitti', 'HT_TAKIP_YOK']) {
+    const b = kur({ rpc: () => { throw new Error(hata); } });
+    await assert.doesNotReject(b.s.htMuayeneVakaBagla(bag, 'c1'));
+    assert.deepStrictEqual(b.toastlar, [{ m: '⚠️ Vaka kayıtlı, takip bağlanamadı', e: true }], hata);
+    assert.deepStrictEqual(b.pulllar, [], hata);
+  }
+  for (const hata of ['HT_GOREV_KAPALI', 'HT_TAKIP_KAPALI']) {
+    const c = kur({ rpc: () => { throw new Error(hata); } });
+    await assert.doesNotReject(c.s.htMuayeneVakaBagla(bag, 'c1'));
+    assert.deepStrictEqual(c.toastlar, [], hata);
+    assert.deepStrictEqual(c.pulllar, [TABLOLAR], hata);
+  }
+});
+
 // ── Vaka sonrası ─────────────────────────────────────────────
 test('HT-P-11: açık takip yoksa pencere yok; hayvan_takip önce çekilir', async () => {
   const k = kur({ takipler: [takip('x', { hayvan_id: 'H2' })] });
@@ -670,7 +830,7 @@ test('HT-P-12c: her data-action="ht-*" handlers.js\'te kayıtlı ve doğru işle
   const A = {};
   const cagri = [];
   const casus = ad => el => { cagri.push([ad, el]); };
-  const fnler = ['htAcGonder', 'htMuayeneGonder', 'htKapatGonder', 'htSonucGonder', 'htTumunuSec', 'htAcikKalsin'];
+  const fnler = ['htAcGonder', 'htMuayeneGonder', 'htKapatGonder', 'htSonucGonder', 'htTumunuSec', 'htAcikKalsin', 'htSonucVakaAc', 'htVakaBagla'];
   loadBrowserModule('js/utils/handlers.js', {
     extra: {
       registerActions: m => Object.assign(A, m),
@@ -682,7 +842,7 @@ test('HT-P-12c: her data-action="ht-*" handlers.js\'te kayıtlı ve doğru işle
   eylemler.forEach(e => assert.strictEqual(typeof A[e], 'function', e));
   const beklenen = {
     'ht-ac-gonder': 'htAcGonder', 'ht-mu-gonder': 'htMuayeneGonder', 'ht-ka-gonder': 'htKapatGonder',
-    'ht-so-gonder': 'htSonucGonder', 'ht-tumunu-sec': 'htTumunuSec', 'ht-acik-kalsin': 'htAcikKalsin',
+    'ht-so-gonder': 'htSonucGonder', 'ht-tumunu-sec': 'htTumunuSec', 'ht-acik-kalsin': 'htAcikKalsin', 'ht-so-vaka-ac': 'htSonucVakaAc',
   };
   const el = { dataset: {} };
   for (const [e, f] of Object.entries(beklenen)) {
@@ -691,6 +851,10 @@ test('HT-P-12c: her data-action="ht-*" handlers.js\'te kayıtlı ve doğru işle
     assert.strictEqual(cagri[0][0], f, e);
     if (/gonder/.test(e)) assert.strictEqual(cagri[0][1], el, e + ' düğmeyi geçirir');
   }
+  // Satırlar çalışma anında üretilir, index.html'de yoktur; düğmeyi geçirir.
+  cagri.length = 0;
+  A['ht-so-vaka-bagla'](el);
+  assert.deepStrictEqual(cagri, [['htVakaBagla', el]]);
   const iptal = { 'ht-ac-iptal': 'm-ht-ac', 'ht-mu-iptal': 'm-ht-muayene', 'ht-ka-iptal': 'm-ht-kapat', 'ht-so-iptal': 'm-ht-sonuc' };
   for (const [e, m] of Object.entries(iptal)) {
     cagri.length = 0;
@@ -707,6 +871,8 @@ test('HT-P-12d: pencere kodunun kullandığı her ht-/m-ht- kimliği index.html\
   kimlikler.forEach(id => assert.ok(html.includes(`id="${id}"`), id));
   assert.match(html, /data-action="ht-so-gonder" data-sonuc="SURSUN"/);
   assert.match(html, /data-action="ht-so-gonder" data-sonuc="KAPANSIN"/);
+  assert.match(html, /<button[^>]*data-action="ht-so-vaka-ac"[^>]*>🏥 Vaka aç \/ tedavi planı<\/button>/);
+  assert.match(html, /<div id="ht-so-vakalar" style="display:none/);
   for (const metin of ['Tümünü seç', 'Açık kalsın', 'Takip sürsün', 'Takip kapansın']) {
     assert.ok(html.includes(metin), metin);
   }
