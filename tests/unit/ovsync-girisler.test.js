@@ -84,7 +84,7 @@ test('P7-K7: ovsync verisi gelmediyse (5-arg eski çağrı) hücre yine dürüst
 test('P7-K14: _katTipMap.ureme dörtlü liste; muayene listesinden GEBELIK_KONTROL çıkar', () => {
   assert.deepEqual(_katTipMap.ureme,
     ['TOHUMLAMA_PLANLI', 'OVSYNC_BASLAT', 'GEBELIK_KONTROL', 'TAKIP_MUAYENE']);
-  assert.deepEqual(_katTipMap.muayene, ['MUAYENE', 'VETERINER_KONTROL'],
+  assert.deepEqual(_katTipMap.muayene, ['MUAYENE', 'VETERINER_KONTROL', 'HAYVAN_TAKIP_MUAYENE'],
     'GEBELIK_KONTROL Muayene kategorisinden çıkarılmalı');
 });
 

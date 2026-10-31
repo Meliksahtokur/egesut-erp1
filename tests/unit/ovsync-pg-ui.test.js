@@ -30,7 +30,7 @@ const { _tohKaynakEtiket, _kalanGunEtiket, _ovsyncBaslatBtnHtml, _erteleBtnHtml 
 test('P3/P7-K14: _katTipMap üreme kategorisi dörtlü liste (GEBELIK_KONTROL + TAKIP_MUAYENE dahil)', () => {
   assert.deepEqual(exposed._katTipMap.ureme,
     ['TOHUMLAMA_PLANLI', 'OVSYNC_BASLAT', 'GEBELIK_KONTROL', 'TAKIP_MUAYENE']);
-  assert.deepEqual(exposed._katTipMap.muayene, ['MUAYENE', 'VETERINER_KONTROL'],
+  assert.deepEqual(exposed._katTipMap.muayene, ['MUAYENE', 'VETERINER_KONTROL', 'HAYVAN_TAKIP_MUAYENE'],
     'GEBELIK_KONTROL Muayene listesinden çıkarıldı (K14)');
 });
 

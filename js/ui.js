@@ -63,7 +63,7 @@ async function _keepScroll(contentEl,fn){
 const _katTipMap={
   asi:    ['ASI_PLANLI','ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
-  muayene:['MUAYENE','VETERINER_KONTROL'],   // K14: GEBELIK_KONTROL Üreme'ye taşındı (§18.16)
+  muayene:['MUAYENE','VETERINER_KONTROL','HAYVAN_TAKIP_MUAYENE'],   // K14: GEBELIK_KONTROL Üreme'ye taşındı (§18.16)
   tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
   ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT','GEBELIK_KONTROL','TAKIP_MUAYENE'],   // P3+K14: "işin ucunda gebelik varsa üreme" — GEBELIK_KONTROL Muayene'den, TAKIP_MUAYENE eklendi
   bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
@@ -543,7 +543,7 @@ function _dashIleriGebeBandi(ileriGebeler){
   });
   return band('amber',title,rows.join(''));
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList,takipSatirlari){
   const _dd=ddMap||{};
   /**
    * Görev tipinin 'TEDAVI_GUN' olmadığı durumlarda boş string döndürür; aksi takdirde açıklama alanındaki day_id değeri üzerinden _dd dizisinden karşılık gelen değeri döndürür.
@@ -559,6 +559,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
    */
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
   let h='';
+  if((takipSatirlari||[]).length) h+=htBandHtml(takipSatirlari); // §20.3: en üstte; eski çağrılar parametresiz
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
     h+=`<div class="sh"><span class="sh-title">🔴 Geciken Görevler</span><button class="sh-link" onclick="goTo('tasks')">Tümü →</button></div>`;
@@ -2019,7 +2020,7 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=bugun();
-    const [animals,diseases,tasks,stock,births60,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
+    const [animals,diseases,tasks,stock,births60,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum,acikTakipler]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi&&!t.iptal),
@@ -2030,6 +2031,7 @@ async function loadDash(){
       getData('vaccines'),
       getData('kizginlik_log'),
       getData('tohumlama'),
+      getData('hayvan_takip',t=>!t.kapanis_tarihi),
     ]);
     const critStk=stock.filter(s=>s.stok_durum==='kritik').length;
     const negStk=stock.filter(s=>s.stok_durum==='tukendi').length;
@@ -2119,7 +2121,7 @@ async function loadDash(){
 
     // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
     // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge,ovStat)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge,ovStat)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList,htDashSatirlari(acikTakipler,animals))+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -4251,7 +4253,7 @@ function _erteleBtnHtml(t){
   if(t.tamamlandi||t.iptal) return '';
   // §18.17: GEBELIK_KONTROL/TAKIP_MUAYENE ertelemesi YALNIZ birleşik sonuç
   // ekranından (ERTALE) — genel ertele butonu bu tiplerde çizilmez (§10d #3).
-  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE') return '';
+  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'||t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE') return ''; // §20.6: genel Ertele yok
   const kural=ertelemeKuralGetir(t.gorev_tipi);
   if(!kural||!kural.ertelenebilir) return '';
   if(!_ertelemeOnline()) return '';
@@ -4646,7 +4648,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'&&t.gorev_tipi!=='GEBELIK_KONTROL'&&t.gorev_tipi!=='TAKIP_MUAYENE'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'&&t.gorev_tipi!=='GEBELIK_KONTROL'&&t.gorev_tipi!=='TAKIP_MUAYENE'&&t.gorev_tipi!=='HAYVAN_TAKIP_MUAYENE'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -5021,6 +5023,9 @@ async function loadAnimals(){
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
+    // 📌 rozet haritası: hayvan başına açık takipler (R4)
+    globalThis._htAcikMap={};
+    (await getData('hayvan_takip',t=>!t.kapanis_tarihi)).forEach(t=>{ (globalThis._htAcikMap[t.hayvan_id]=globalThis._htAcikMap[t.hayvan_id]||[]).push(t); });
     // Bekleyen tohumlama haritası (sadece sonuc=Bekliyor — badge için)
     const bosTohs=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
     globalThis._bosTohMap={};
@@ -5105,11 +5110,12 @@ function _animalTagsHtml(a,gebeSet){
   const _dGun=_yeniDogumGun(a);
   if(_dGun!=null) dogumBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">🐣 ${_dGun} gün önce doğum yaptı</span>`;
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
+  const takipBadge=((globalThis._htAcikMap||{})[a.id]||[]).map(t=>`<span class="tag" style="color:var(--blue);font-weight:700">📌 ${esc(htSebepEtiket(t))}</span>`).join('');
   // Repeat breed badge (backend view'dan gelir: repeat_breed_active, repeat_breed_past)
   let repeatBadge='';
   if(a.repeat_breed_active) repeatBadge+=`<span class="repeat-badge active">🔁 Tekrar Aşım</span>`;
   if(a.repeat_breed_past)   repeatBadge+=`<span class="repeat-badge past">↻ Tekrar</span>`;
-  return `<span class="tag tb">${esc(a.padok||'?')}</span><span class="tag tk">${esc(a.grup||'')}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${repeatBadge}`;
+  return `<span class="tag tb">${esc(a.padok||'?')}</span><span class="tag tk">${esc(a.grup||'')}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${takipBadge}${repeatBadge}`;
 }
 /**
  * Bir hayvan kaydının HTML kartını oluşturur. Kart, hayvanın kimlik bilgilerini, yaşını, ırkını ve etiketlerini içerir.
@@ -6866,11 +6872,11 @@ let _DET_TAZELE_DEBOUNCE_MS=250;
 // Kartın GERÇEK okuma evreni (SPEC §3.3, R1-H01) — tek sabit, kaynak gruplarıyla:
 //   openDet pull+getData evreni: hayvanlar, cases, diseases, dogum, gorev_log,
 //     tohumlama, kizginlik_log, uygulama_log, vaccination_log, vaccines, drugs,
-//     drug_products, drug_classes
+//     drug_products, drug_classes, hayvan_takip
 //   _detRenderGecmis → _gecmisCollectSources evreni: islem_log, stok_hareket,
 //     treatment_days, drug_administrations, protokol_instance, stok
 // openDet okuma grafiği değişirse bu sabit birlikte güncellenir.
-const _DET_TABLOLAR=['hayvanlar','cases','diseases','dogum','gorev_log','tohumlama','kizginlik_log','uygulama_log','vaccination_log','vaccines','drugs','drug_products','drug_classes','islem_log','stok_hareket','treatment_days','drug_administrations','protokol_instance','stok'];
+const _DET_TABLOLAR=['hayvanlar','cases','diseases','dogum','gorev_log','tohumlama','kizginlik_log','uygulama_log','vaccination_log','vaccines','drugs','drug_products','drug_classes','hayvan_takip','islem_log','stok_hareket','treatment_days','drug_administrations','protokol_instance','stok'];
 window.__detSayac={openDet:0,epoch:0}; // test/demo oracle'ı (A1/A7/A16)
 /**
  * Hayvan kartının (#det) açık olup olmadığını söyler — 'on' sınıfı VE aktif kart kimliği şart.
@@ -7163,14 +7169,16 @@ function filterA(){
  * @param {Array} tohs Gebelik sonuçları listesi.
  * @param {Number} aktifHst Aktif hastalar sayısı.
  * @param {Array} activeCases Aktif vaka listesi.
+ * @param {Array} [acikTakipler] Hayvanın açık takipleri (📌 rozetleri).
  * @returns {String} Chip elemanlarını içeren HTML string.
  */
-function _detChipsHtml(a,tohs,aktifHst,activeCases){
+function _detChipsHtml(a,tohs,aktifHst,activeCases,acikTakipler=[]){
   return [
     {cls:'chip-k',txt:a.grup||'?'},
     {cls:'chip-k',txt:a.padok||'?'},
     aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
     a.kisir?{style:'background:rgba(255,160,0,.15);color:var(--amber)',txt:'💲 Kısır'}:null,
+    ...acikTakipler.map(t=>({style:'color:var(--blue)',txt:`📌 ${htSebepEtiket(t)}`})),
     (()=>{const gToh=tohs.filter(t=>t.sonuc==='Gebe').sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))[0]; if(!gToh)return null; const gun=Math.floor((Date.now()-new Date(gToh.tarih))/86400000); return {cls:'chip-g',txt:`🤰 ${gun}. gün · Tahmini: ${dFwd(gToh.tarih,280)}`};})(),
   ].filter(Boolean).map(c=>`<div class="chip ${c.cls||''}"${c.style?` style="${c.style}"`:''}>${esc(c.txt)}</div>`).join('');
 }
@@ -7185,9 +7193,13 @@ function _detChipsHtml(a,tohs,aktifHst,activeCases){
  * @param {number|null} yasRaw Hayvanın ham yaş değeri (gün cinsinden).
  * @param {number} yasGun Hayvanın yaşını göstermek için formatlanmış metin.
  * @param {string} displayId Hayvanın küpe numarası veya benzeri gösterim kimliği.
+ * @param {Array} [acikTakipler] Hayvanın açık takipleri.
  * @returns {string} Hayvan detay sayfası için HTML kodu.
  */
-function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId){
+function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId,acikTakipler=[]){
+  const _htDugme=(fn,metin)=>`<button class="btn btn-o" style="margin-top:6px;padding:9px" data-hid="${escAttr(a.id)}" onclick="${fn}(this.dataset.hid)">${metin}</button>`;
+  // §5.1: çıkmış hayvanda takip düğmesi yok; RPC de reddeder.
+  const takipDugmeleri=a.durum!=='Aktif'?'':_htDugme('htAcPencere','📌 Takibe al')+(acikTakipler.length?_htDugme('htMuayenePencere','🔍 Muayene planla')+_htDugme('htKapatPencere','✓ Takibi kapat'):'');
   const infoFields=[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Cinsiyet',v:a.cinsiyet||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Doğum Kg',v:a.dogum_kg?a.dogum_kg+' kg':'—'},{l:'Canlı Ağırlık',v:a.canli_agirlik?a.canli_agirlik+' kg':'—'},{l:'Boy',v:a.boy?a.boy+' cm':'—'},{l:'Renk',v:a.renk||'—'},{l:'Ayırt Edici',v:a.ayirici_ozellik||'—'},{l:'Durum',v:a.durum||'—'},{l:'Baba (Sperma)',v:a.baba_bilgi||'—'}];
   const anneObj=a.anne_id?getState('animals').find(x=>x.id===a.anne_id):null;
   const anneKupe=anneObj?.kupe_no||anneObj?.devlet_kupe||a.anne_id;
@@ -7219,6 +7231,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
       <div class="ss-item"><div class="ss-val">${diseases.length}</div><div class="ss-lbl">Toplam Vaka</div></div>
       <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
     </div>
+    ${acikTakipler.length?htKartBlokHtml(acikTakipler,tasks):''}
     <div class="info-grid">
       ${infoFields.map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${esc(i.v)}</div></div>`).join('')}
     </div>
@@ -7235,6 +7248,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı Uygulama</button>
+    ${takipDugmeleri}
     <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>
     ${typeof degisikliklerHayvanIcin === 'function' ? `<button class="btn btn-o" style="margin-top:6px;padding:9px" data-action="dg-hayvan-degisiklikleri" data-hid="${escAttr(a.id)}" data-kupe="${escAttr(displayId)}">🧾 Bu hayvanın değişiklikleri</button>` : ''}`;
 }
@@ -7618,10 +7632,10 @@ async function openDet(id, keepTab){
   // Soy sekmesi aktifse controller yükler, değilse sekme ilk aktive olduğunda yükler.
   const _pedPane=document.getElementById('tab-pedigree');
   if (typeof pedigreeSetFocus === 'function') pedigreeSetFocus(id, !!(_pedPane && _pedPane.classList && _pedPane.classList.contains('on')));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes'], {detInternal:true}).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes','hayvan_takip'], {detInternal:true}).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(myGen!==_detGen) return;
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs]=await Promise.all([
+    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs,tumAcikTakip]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -7633,10 +7647,12 @@ async function openDet(id, keepTab){
       getData('vaccination_log',v=>v.animal_id===id),
       getData('kizginlik_log',k=>k.hayvan_id===id),
       getData('uygulama_log',u=>u.hayvan_id===id),
+      getData('hayvan_takip',t=>!t.kapanis_tarihi),
     ]);
     if(myGen!==_detGen) return;
     // K7: id/küpe referansıyla eşleşen birden çok kayıt varsa AKTİF olan önce
     const a=aArr.find(x=>x.durum==='Aktif')||aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
+    const acikTakipler=tumAcikTakip.filter(t=>t.hayvan_id===a.id); // id küpe de olabilir: çözülen hayvanla eşleşir
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
@@ -7649,9 +7665,9 @@ async function openDet(id, keepTab){
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
     document.getElementById('det-name').textContent=displayId;
     document.getElementById('det-meta').textContent=`${a.irk||'—'} · ${a.padok||'?'}`;
-    document.getElementById('det-chips').innerHTML=_detChipsHtml(a,tohs,aktifHst,activeCases);
+    document.getElementById('det-chips').innerHTML=_detChipsHtml(a,tohs,aktifHst,activeCases,acikTakipler);
 
-    document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
+    document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId,acikTakipler);
 
     const allDiseasesList=await idbGetAll('diseases');
     // H-02: myGen alt helper'lara geçirilir — helper içi await'ler askıda kalırken
@@ -7793,7 +7809,9 @@ function _openIslemDetayRow(l, anchor){
   // panel butonu ÖLÜydü (sahibin "geri al butonu her yerde yok" sözü bu
   // yüzde yaşıyordu) — çözücü kararı doğrudan kullanılır.
   const geriAlabilir=!!_gmGeriAlHedef(l);
-  const satirlar=_islemDetaySatirlariHtml(l.payload);
+  // §5.6: üç takip tipi payload yazmaz; not ve sebep paneli boş bırakmaz.
+  const htAlt=typeof gmHtIslemAlt==='function'?gmHtIslemAlt(l):'';
+  const satirlar=_islemDetaySatirlariHtml(l.payload)||(htAlt?`<div style="font-size:.78rem;color:var(--ink)">${esc(htAlt)}</div>`:'');
   const gaBtn=geriAlabilir&&l.id
     ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" data-action="dg-det-geri-al" data-det="${escAttr(String(l.id))}">↩ Geri Al</button>`
     : '';
@@ -9094,6 +9112,7 @@ function _gecmisEntryHtml(e, overrideOc){
     if(data.tip==='ASI_KAYDI') sub=esc(snap.vaccine_name||'');
     else if(data.tip==='ASI_ERTELEME') sub=esc(snap.erteleme_notu||snap.vaccine_name||'');
     else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
+    else if(/^HAYVAN_TAKIP_/.test(data.tip||'')) sub=esc(gmHtIslemAlt(data));
     else { const _irk=snap.irk||snap.grup||''; sub=esc(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(_irk).trim())?'':_irk); } // W8-D3: ham UUID alt satıra da girmez
     // U1 md.2: işlem aynası kartı KOŞULSUZ tıklanabilir — hayvan detayındaki
     // aynanın gittiği yer: islem detay paneli (openIslemDetay hattı). id yoksa
@@ -9173,7 +9192,7 @@ function _gecmisSearchText(e){
   }
   else if(e.type==='islem'){
     const snap=d.snapshot||{};
-    parts.push(_gmIslemTipEtiket(d.tip),snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||''); // U1: etiket + yedek aramaya da düşer
+    parts.push(_gmIslemTipEtiket(d.tip),snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'',/^HAYVAN_TAKIP_/.test(d.tip||'')?gmHtIslemAlt(d):''); // U1: etiket + yedek aramaya da düşer
   }
   // TG1 tek-gün görünümü kategorileri
   else if(e.type==='asi'){parts.push(d._asiAdi||'','aşı','aşı kaydı');}
@@ -11565,6 +11584,8 @@ async function openTaskDet(id){
   // butonuna ULAŞILAMIYORDU ve görevin tek çıkışı gerçekten tohumlamaktı.
   // Artık modal normal açılıyor; tamamla butonu aşağıda forma yönlendiriliyor.
   _curTaskDet=t;
+  // R5 (§20.6): jenerik detay hiç açılmaz, Ertele/İptal/düzenleme yolları böyle kapanır. Çevrimdışıysa htSonucAc uyarır.
+  if(t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE'){ await htSonucAc(t.id); return; }
   // K15 (T-04/T-05): muayene görevinde tıklama birleşik sonuç ekranına gider;
   // seçici açılamazsa (bayrak kapalı/offline) akış jenerik detay yedeğine düşer —
   // orada "✅ Tamamlandı" gizlidir (P3b UI ikizi), 🗑 İptal yolu açık kalır
@@ -11619,7 +11640,7 @@ async function openTaskDet(id){
 
   // K15: muayene görevi yedeğinde jenerik tamamlama butonu GİZLİ — sonuç YALNIZ
   // birleşik ekrandan (P3b gorev_tamamla guard'ının UI ikizi).
-  if((t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE')&&tamamBtn) tamamBtn.style.display='none';
+  if((t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'||t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE')&&tamamBtn) tamamBtn.style.display='none';
 
   // ILERI_GEBE_ASI / ASI_RAPEL / ASI_HATIRLATMA: standart tamamla gizle, aşı butonu göster.
   // ASI_RAPEL özel olarak işlenmeli — generic 'Tamamlandı' görevi kayıtsız kapatıyordu
@@ -11827,6 +11848,7 @@ async function detayTamamla(){
   // K15: muayene görevleri jenerik doneTask'e ASLA düşmez (P3b gorev_tamamla
   // guard'ının UI ikizi) — iki tip AYNI birleşik sonuç ekranını açar (T-04/T-05).
   if(_curTaskDet.gorev_tipi==='GEBELIK_KONTROL'||_curTaskDet.gorev_tipi==='TAKIP_MUAYENE') return _muayeneSonucAc(_curTaskDet.id);
+  if(_curTaskDet.gorev_tipi==='HAYVAN_TAKIP_MUAYENE') return htSonucAc(_curTaskDet.id);
   // §3: etken_kod varsa ama stok_id yoksa → önce stok seçtir
   if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
     return _gorevStokSecVeTamamla(_curTaskDet);
@@ -12210,7 +12232,10 @@ async function openDoneTaskDet(id){
   const geriBtn=document.getElementById('dd-geri-al-btn');
   const daysSince=Math.floor((Date.now()-new Date(t.tamamlanma_tarihi||0))/86400000);
   const childDone=rapelChild&&rapelChild.tamamlandi;
-  if(daysSince>7||childDone){
+  if(t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE'){ // R6 (§20.7): geri açmak kapalı takibe açık görev bırakırdı
+    geriBtn.disabled=true;
+    geriBtn.textContent='Muayene sonucu geri alınamaz';
+  } else if(daysSince>7||childDone){
     geriBtn.disabled=true;
     geriBtn.textContent=childDone?'Rapel yapılmış (geri alınamaz)':'7 günden eski';
   } else {
@@ -13962,6 +13987,9 @@ function tarihAlaniTakvimAc(el, o){
 //   kullanmıyor — bileşene iletimi tarihAlaniTakvimAc'ta garantili)
 // · sınırsız      → görev hedef tarihleri (ta/te) — gelecek meşru
 const TARIH_ALANLARI = {
+  'ht-ac-tarih':    { min: 'bugun', temizlenebilir: true }, // takip muayenesi: geçmiş olamaz (§20.8)
+  'ht-mu-tarih':    { min: 'bugun', temizlenebilir: true },
+  'ht-so-tarih':    { min: 'bugun', temizlenebilir: true }, // boş = sonraki muayene yok
   'k-tarih':        { max: 'bugun' },                       // kızgınlık tarihi
   'i-tarih':        { max: 'bugun' },                       // tohumlama tarihi
   'tr-tarih':       { max: 'bugun' },                       // tekrar aşım tarihi
