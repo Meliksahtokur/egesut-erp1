@@ -190,7 +190,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 - `dogum.olay_id uuid`: 1 doğum olayı = 1 olay_id; her buzağı ayrı `dogum` satırı (1 satır = 1 buzağı)
 - **Olay penceresi 10 gün:** aynı annede pencere içinde yeni doğum girilirse aynı olaya bağlanır → dönüş `coklu_dogum: true, yavru_sirasi`; yalnız 7 buzağı görevi açılır
 - **Anne görev guard'ı 60 gün:** yakın doğum varsa 8 anne görevi + tohumlama kapatma + grup/padok + protokol + BESLEME iptali ASLA tekrarlanmaz (kullanıcı kuralı: "birinci yavrunun hiçbir anne görevi tekrarlanmaz")
-- Aynı (anne_id, yavru_kupe) ikinci kez gönderilemez — RPC reddeder (typo → yanlış ikiz engeli)
+- Aynı (anne_id, yavru_kupe) yalnız o yavru **aktifken** reddedilir (typo → yanlış ikiz engeli). Yavru ölmüş/çıkmışsa küpesi aynı anne dahil her yolda serbest (K1, sahip 2026-10-31; migration 20261031000001). Eski doğum satırı küpeyi değil `dogum.buzagi_id`'yi açar.
 - Kardeş tanımı (frontend, `_kardeslerBul`): aynı `anne_id` + aynı `dogum_tarihi` → hayvan kartında `Anne:` bloğu altında kardeş satırı
 - UI: doğumdan sonraki 10 günde anne kartında "➕ Bu doğuma yavru ekle" butonu (anne/tarih/baba prefilled modal; `ikinciYavruAc`)
 - `dogum_sayisi` = `COUNT(DISTINCT olay_id)` (`hayvan_belirsiz_ureme_listele` + `v_ureme_dongusu`); buzağı sayısı = satır sayısı
@@ -267,6 +267,7 @@ Canlı `diseases` Üreme'de 12 kayıt var (2026-10-13 MEASURED); Ovsync alt vaka
   (kod tabanında `'Pasif'` değeri **yoktur** — davranışsal sonuç aynıdır: hayvan listelerde görünmez,
   tohumlama/doğum kaydı yapılamaz)
 - Çıkış sonrası açık görevleri `trg_hayvan_cikis_gorev_iptal` trigger'ı iptal eder
+- **UI kuralı (sahip 2026-10-31):** arayüzden yalnız aktif hayvan düzenlenir; çıkmış hayvanda "Hayvan bulunamadı" davranışı doğrudur (`openAnimalEdit`), düzeltilecek hata değildir. Çıkmış hayvan aktif hayvanlarla aynı listede görünmez.
 
 ---
 

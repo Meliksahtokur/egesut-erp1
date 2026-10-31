@@ -78,6 +78,7 @@ kontrolü (kendi kaydı hariç, migration 20260901000002).
 → **2026-09-01 küpe revizyonu (migration 20260901000002):** işletme küpesi kontrolü yalnız
 `durum='Aktif'` hayvanlarda (recycle K1); devlet küpesi GLOBAL (TURKVET, K2). Dönüşe yeni alanlar:
 `kupe_gecmis_id` + `kupe_gecmis_durum` (numara çıkmış hayvanda kullanılmışsa bilgi amaçlı — engel değil).
+→ **2026-10-31 (migration 20261031000001):** `p_hayvan_id`'nin kendi değişmeyen küpesi denetlenmez; küpesi başkasına verilmiş çıkmış hayvanın kartı düzenlenebilir (`hayvan_guncelle` overload 3 de bu fonksiyonu çağırır).
 DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanlar(kupe_no) WHERE durum='Aktif' AND kupe_no IS NOT NULL AND kupe_no <> ''` — string-bazlı, "002"≠"02").
 
 **`padok_degistir(p_hayvan_id, p_yeni_padok_id uuid, p_not?)`** → jsonb
@@ -185,6 +186,7 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 → **2026-09-01 küpe revizyonu (migration 20260901000002):** (1) dup check işletme küpesinde yalnız
 `durum='Aktif'` filtreli (recycle K1; devlet küpesi GLOBAL kalır), (2) erkek buzağı + sayısal küpe
 500-599 dışı → `ok:false` red (K5 sunucu kuralı; JS tarafı `submitBirth` de sert engeller).
+→ **2026-10-31 (migration 20261031000001):** ikiz guard'ı yalnız `dogum.buzagi_id` aktif yavruya bakar; çıkmış yavrunun küpesi aynı annede serbest (K1).
 → Çağrı: forms.js:177; replay: ui.js:6738, 6862.
 
 ---
