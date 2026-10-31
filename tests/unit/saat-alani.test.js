@@ -267,7 +267,7 @@ test('G3 #10: cdt-saat yardımcıda, 08:00 dolu; yarım saat gönderilmez, boş 
 
 test('G4 #8: şablon tohumlama saati yardımcıda, kendi satırında; çipin change olayı mevcut handler\'a gider', () => {
   const ui = oku('js/ui.js');
-  const satir = ui.split('\n').find(l => l.includes("saatAlaniHtml('sablon-tohumlama-saat'"));
+  const satir = ui.split('\n').find(l => l.includes('saatAlaniHtml(`sablon-tohumlama-saat-${gi}`'));
   assert.ok(satir, 'yardımcıya alındı');
   assert.match(satir, /deger: tohumlama\.planned_time/);
   assert.match(satir, /data-change="sablon-tohumlama-saat"/);
@@ -278,13 +278,35 @@ test('G4 #8: şablon tohumlama saati yardımcıda, kendi satırında; çipin cha
 
 test('G4 #8: yarım şablon saati şablon kaydını durdurur', async () => {
   const k = kur();
-  k.alan('sablon-tohumlama-saat').validity = { badInput: true };
+  k.alan('sablon-tohumlama-saat-1').validity = { badInput: true };
 
   await loadExtractedFunction('js/ui.js', 'sablonKaydet', {
-    extra: { saatYarimMi: k.s.saatYarimMi, _sablonEdit: { ad: 'A', gunler: [] }, toast() { throw new Error('ad uyarısına inmemeli'); } },
+    extra: { saatYarimMi: k.s.saatYarimMi, _sablonEdit: { ad: 'A', gunler: [{}, {}] }, toast() { throw new Error('ad uyarısına inmemeli'); } },
   })();
   assert.strictEqual(k.toastlar.length, 1);
   assert.match(k.toastlar[0].m, /Saat/);
+});
+
+test('G4 #8b: tohumlama saati satır başına benzersiz id alır; çip kendi satırına yazar, data-change korunur', () => {
+  const { s } = kur();
+  const govde = makeElement('div');
+  loadExtractedFunction('js/ui.js', '_renderSablonBuilder', {
+    extra: {
+      saatAlaniHtml: s.saatAlaniHtml,
+      esc: x => String(x),
+      // Aynı ofset iki günde: tohumlama satırı ikisinde de çizilir.
+      _sablonEdit: { ad: '', aciklama: '', disease_ids: [], _diseases: [], gunler: [{ offset: 2, kalemler: [] }, { offset: 2, kalemler: [] }], tohumlama_plani: { gun_ofset: 2, planned_time: '08:00' } },
+      document: { getElementById: () => govde },
+    },
+  })();
+  const inputlar = [...govde.innerHTML.matchAll(/<input id="(sablon-tohumlama-saat[^"]*)"[^>]*>/g)];
+  assert.deepStrictEqual(inputlar.map(m => m[1]), ['sablon-tohumlama-saat-0', 'sablon-tohumlama-saat-1']);
+  inputlar.forEach(m => assert.match(m[0], /data-change="sablon-tohumlama-saat"/));
+  const satirlar = govde.innerHTML.split('sablon-gun-body-').slice(1);
+  satirlar.forEach((satir, i) => {
+    const hedefler = new Set([...satir.matchAll(/data-hedef="([^"]*)"/g)].map(m => m[1]));
+    assert.deepStrictEqual([...hedefler], ['sablon-tohumlama-saat-' + i]);
+  });
 });
 
 test('G4 #11: seans düzenleme saati yardımcıda, kendi satırında; mevcut saat dolu ve id korunur', () => {
@@ -326,15 +348,17 @@ test('G6 kabul: tek yardımcı, 14 alan korunur, pu-saat çipsiz', () => {
     ['bc-tohum-saat', 'ht-ac-saat', 'ht-mu-saat', 'ht-so-saat'],
   );
   const js = kaynaklar.map(oku).join('\n');
-  for (const id of ['bc-gsaat', 'seans-add-time', 'sbs-time', 'sablon-tohumlama-saat', 'saat-input', 'cdt-saat', 'ert-saat', 'devam-ertele-saat', 'pu-saat']) {
+  for (const id of ['bc-gsaat', 'seans-add-time', 'sbs-time', 'saat-input', 'cdt-saat', 'ert-saat', 'devam-ertele-saat', 'pu-saat']) {
     assert.ok(js.includes(`saatAlaniHtml('${id}'`), id);
   }
   assert.ok(js.includes("saatAlaniHtml('sd-time-' + seansId"), 'sd-time-<id>');
+  assert.ok(js.includes('saatAlaniHtml(`sablon-tohumlama-saat-${gi}`'), 'sablon-tohumlama-saat-<gi>');
   assert.match(js, /saatAlaniHtml\('pu-saat', \{ cipler: false,/);
   // Yarım giriş kontrolü boş anlamı olan her alanda.
-  for (const id of ['ht-ac-saat', 'ht-mu-saat', 'ht-so-saat', 'bc-tohum-saat', 'cdt-saat', 'ert-saat', 'devam-ertele-saat', 'pu-saat', 'sablon-tohumlama-saat']) {
+  for (const id of ['ht-ac-saat', 'ht-mu-saat', 'ht-so-saat', 'bc-tohum-saat', 'cdt-saat', 'ert-saat', 'devam-ertele-saat', 'pu-saat']) {
     assert.ok(js.includes(`saatYarimMi('${id}')`), id);
   }
+  assert.ok(js.includes('saatYarimMi(`sablon-tohumlama-saat-${gi}`)'), 'sablon-tohumlama-saat-<gi>');
   assert.strictEqual((oku('js/forms.js').match(/tohumIste && saatYarimMi\('bc-tohum-saat'\)/g) || []).length, 2, 'şablon ve toplu vaka');
 });
 
