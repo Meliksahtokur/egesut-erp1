@@ -136,6 +136,7 @@ async function goTo(pg, push = true) {
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
   else if (pg === 'asistan')  { if (typeof asistanInit === 'function') asistanInit(); }
   else if (pg === 'ovsync')   { if (typeof loadOvsyncDash === 'function') loadOvsyncDash(); }
+  else if (pg === 'istatistik') { if (typeof loadIstatistik === 'function') loadIstatistik(); }
   if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
 }
 

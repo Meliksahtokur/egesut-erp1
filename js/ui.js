@@ -308,6 +308,7 @@ function _dashStatRow(animals,gebeTohs,diseases,tasks,badge,ovsync){
     <div class="sc ${sutBuzagiSayisi>0?'warn':'ok'}" onclick="openSuttenKesModal()"><div class="sv">${sutBuzagiSayisi}</div><div class="sl">🍼 Sütten Kes ›</div></div>
     <div class="sc ${badge>0?'alert':_taskCls}" onclick="goTo('tasks')"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev ›</div></div>
     <div class="sc ${_ovCls}" onclick="goTo('ovsync')"><div class="sv">${_ovSayi}</div><div class="sl">🔄 Ovsync ›</div></div>
+    <div class="sc ok" onclick="goTo('istatistik')"><div class="sv">📊</div><div class="sl">İstatistik ›</div></div>
   </div>`;
 }
 /**
@@ -642,6 +643,7 @@ function _ovsyncBayatEtiket(zaman){
   if(!d||isNaN(d.getTime())) return 'çevrimdışı veri';
   return 'çevrimdışı · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+' verisi';
 }
+// İstatistik ekranı: js/istatistik/atolye.js (AP1 T11; eski F1 T8 iskeleti emekli)
 /**
  * Ovsync takip sayfasını yükler: P4 ovsyncTakipGetir'i çağırıp 4 durumdan birini
  * #ovsync-root'a yazar; render sonrası §6b kaydırma sözleşmesiyle ovsync'ten ayrılırken

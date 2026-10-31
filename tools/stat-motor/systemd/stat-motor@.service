@@ -1,0 +1,6 @@
+[Unit]
+Description=EgeSut istatistik motoru (%i)
+
+[Service]
+Type=oneshot
+ExecStart=%h/egesut-erp1/tools/stat-motor/.venv/bin/stat-motor run --profil %i

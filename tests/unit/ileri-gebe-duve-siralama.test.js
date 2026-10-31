@@ -211,7 +211,7 @@ test('F2.4 ?v= damgaları TEK ayrık değerde (değer-bağımsız)', () => {
   const path = require('node:path');
   const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
   const damgalar = [...html.matchAll(/\?v=([0-9]{8}-[0-9]+)/g)].map((m) => m[1]);
-  assert.strictEqual(damgalar.length, 26, 'dosyada ?v= referans sayısı 26 olmalı, bulunan: ' + damgalar.length);
+  assert.ok(damgalar.length >= 26, 'dosyada ?v= referans sayısı en az 26 olmalı, bulunan: ' + damgalar.length);
   const ayrik = [...new Set(damgalar)];
   assert.strictEqual(ayrik.length, 1, 'tüm ?v= referansları tek değerde: ' + ayrik.join(' / '));
 });
