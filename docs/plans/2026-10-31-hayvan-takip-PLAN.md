@@ -52,7 +52,7 @@ Spec §3 (K1-K9), §4, §5 yeniden sorulmaz. Görev tipi, kolon ve RPC adları s
 | R11 | `islem_log` `HAYVAN_TAKIP_MUAYENE` yalnız sonuç girişinde yazılır; planlama yazmaz. | Spec §5.6 "not metni görünür" sonuç notunu hedefler. |
 | R12 | `DIGER` satırı, rozeti ve listesi sebep olarak `aciklama` gösterir; görev açıklaması `Diğer takibi muayenesi` kalır. | "Neden" sorusu tek başına "Diğer" ile cevaplanmaz; görev metni spec §5.4. Tasarım ayrıntısıdır; §20'ye yazılmaz. |
 | R13 | `hayvan_takip_ac` kilit sırası: `hayvanlar` → `hayvan_takip` → `gorev_log`. Dört RPC de bu sırayı izler. | Çıkış tetikleyicisi aynı sırada çalışır; kilitlenme önlenir. |
-| R14 | Demo yazma yetkisi: sahibin açık talimatı (2026-10-31), kapsam yalnız T6: demo'ya migration apply + ROLLBACK'li `demo_klonla`. Prod, başka TRUNCATE ve kapsam dışı demo yazımı bu yetkiye girmez. | `.harness/contract.md:115-116` canlı yazma için açık talimat, TRUNCATE için son özel onay ister. `demo_klonla` işlem içinde TRUNCATE eder (`demo/02_demo_klonla.sql:115`). |
+| R14 | Demo yazma yetkisi: sahibin açık talimatı (2026-10-31), kapsam yalnız T6: demo'ya migration apply + ROLLBACK'li `demo_klonla`. Commit edilen `demo_klonla`, başka TRUNCATE, prod ve kapsam dışı demo yazımı bu yetkiye girmez. | `.harness/contract.md:115-116` canlı yazma için açık talimat, TRUNCATE için son özel onay ister. `demo_klonla` işlem içinde TRUNCATE eder (`demo/02_demo_klonla.sql:115`). |
 
 Hata kodları (`RAISE EXCEPTION '<KOD>'`, `TAKIP_ACIK` eşleşmesinden kaçınmak için `HT_` önekli): `HT_HAYVAN_AKTIF_DEGIL`, `HT_SEBEP_BOS`, `HT_SEBEP_ZATEN_ACIK`, `HT_ACIKLAMA_GEREKLI`, `HT_TARIH_GEREKLI`, `HT_GECMIS_TARIH`, `HT_BOS_LISTE`, `HT_FARKLI_HAYVAN`, `HT_VAKA_UYUMSUZ`, `HT_TAKIP_YOK`, `HT_TAKIP_KAPALI`, `HT_GOREV_YOK`, `HT_GOREV_TIP_UYUMSUZ`, `HT_GOREV_KAPALI`, `HT_SONUC_GECERSIZ`.
 
@@ -370,7 +370,7 @@ bash tests/sql/hayvan_takip_kos.sh $P1 $P2 $P3 tests/sql/hayvan_takip_karsi_test
 - [ ] **Adım 4:** Spec §7'ye Ö1, Ö2, Ö3a sonuç ve tarih; §20'ye Ö1 davranışı, "demo'da uygulandı; prod bekliyor". §11'e üç islem tipi; §12'ye `HAYVAN_TAKIP_MUAYENE`; §17 "gelecek meşru" satırına üç `ht-*` alanı (`min: bugun`). R6 ve R7 §20.7-8'de zaten yazılı (`5abe587`), yeniden yazılmaz; R12 §20'ye girmez.
 - [ ] **Adım 5:** Commit: `git add -f docs/plans/2026-10-31-hayvan-takip-SPEC.md`, `git add .harness/references/domain-rules.md`.
 
-**## Yazılabilir dosyalar:** spec, `domain-rules.md`, `runs/2026-10-31-hayvan-takip/T6-report.md`, `runs/2026-10-31-hayvan-takip/kanit/*`. Demo DB yazımı yalnız bu görevde.
+**## Yazılabilir dosyalar:** spec, `domain-rules.md`, `runs/2026-10-31-hayvan-takip/T6-report.md`, `runs/2026-10-31-hayvan-takip/kanit/*`. Demo DB yazımı R14 kapsamında yalnız bu görevde; U1 `E2E-HT-UI-` fixture'ı ve Ö1 fixture'ı sahip yetkisine koşullu.
 **## Boyut bütçesi:** Spec ≤25, domain-rules ≤25 satır değişiklik.
 **## Review: T2**
 **## Run:**
@@ -451,14 +451,14 @@ Router modalları: `m-ht-ac`, `m-ht-muayene`, `m-ht-kapat`, `m-ht-sonuc`; `MODAL
 | `HT-P-09` | `htSonucAc` sonraki tarih `+3` dolu; kapalı görevde `false` + toast + `pullTables`; çevrimdışı `false` + toast |
 | `HT-P-10` | `htSonucGonder`: `SURSUN` boş tarih → `p_sonraki_tarih:null`; `KAPANSIN` tarih göndermez; `HT_TAKIP_KAPALI` → toast + tazeleme |
 | `HT-P-11` | `htVakaSonrasi`: açık takip yoksa pencere yok; `pullTables` reddi vaka akışını bozmaz, yalnız uyarı |
-| `HT-P-13` | Spec §6 çıkmış hayvan: `HT_HAYVAN_AKTIF_DEGIL` → toast `htHataMetni`, `pullTables` + açık kart tazelenir (`openDet` sahte, bir kez) |
+| `HT-P-13` | Spec §6 çıkmış hayvan: `HT_HAYVAN_AKTIF_DEGIL` → toast `htHataMetni`, `pullTables(['hayvanlar','hayvan_takip','gorev_log','islem_log'])` bir kez (`hayvanlar` dahil); pencere `openDet` çağırmaz |
 | `HT-P-14` | Spec §6 başka biri kapatmış: `HT_TAKIP_KAPALI` (`htMuayeneGonder`) toast + liste tazelenir; `kapanan=0` (`htKapatGonder`) toast yok, tazeleme var |
 | `HT-P-15` | Spec §6 vaka sonrası kapatma reddi: `baglam:'vaka'` `htKapatGonder` RPC hatası uyarı toast'u verir, vaka yazma ya da `closeM('m-case-det')` çağrısı yok |
 | `HT-P-16` | Pencere açılışında üç tarih alanı boş kalır (`openM` otomatik doldurmaz); `htSonucAc` yalnız `+3` yazar |
 | `HT-P-12` | `index.html`: dört modal id, iki yeni `<script>`; `handlers.js` her `data-action="ht-*"` kayıtlı |
 
 - [ ] **Adım 2:** Kırmızı koş.
-- [ ] **Adım 3:** Uygula. Başarıda: `pullTables(['hayvan_takip','gorev_log','islem_log'])`, `loadDash()`, görev sekmesi açıksa `loadTasks`. Kart `_DET_TABLOLAR` üzerinden tazelenir (F4). Bütün RPC hataları `htHataMetni` ile. `utils/modal.js:26` `openM` boş `input[type=date]`'i bugünle doldurur; pencereler `openM` kullanıyorsa açılışta üç alan temizlenir. `index.html`: `js/hayvan-takip.js` ve `js/hayvan-takip-pencere.js` `forms.js`'den sonra; bütün `?v=` tek değer `20261031-02` (main `20261031-01` kullanıyor, MEASURED).
+- [ ] **Adım 3:** Uygula. Başarıda: `pullTables(['hayvan_takip','gorev_log','islem_log'])`, `loadDash()`, görev sekmesi açıksa `loadTasks`. Kart tazelemenin tek yolu: `pullTables` → `_detAciksaTazele` (`_DET_TABLOLAR`, F4); pencere `openDet` çağırmaz. `openDet` IDB'den okur, iç pull'unda `hayvanlar` yok (`js/ui.js:7621,7625`); bu yüzden `HT_HAYVAN_AKTIF_DEGIL` kolu `hayvanlar`'ı da çeker. Bütün RPC hataları `htHataMetni` ile. `utils/modal.js:26` `openM` boş `input[type=date]`'i bugünle doldurur; pencereler `openM` kullanıyorsa açılışta üç alan temizlenir. `index.html`: `js/hayvan-takip.js` ve `js/hayvan-takip-pencere.js` `forms.js`'den sonra; bütün `?v=` tek değer `20261031-02` (main `20261031-01` kullanıyor, MEASURED).
 - [ ] **Adım 4:** Mevcut damga testleri (`coklu-kaydir-ui`, `ileri-gebe-duve-siralama`, `vaka-toplu-ac`) dahil yeşil. Commit.
 
 **## Yazılabilir dosyalar:** yukarıdaki dört dosya, `runs/2026-10-31-hayvan-takip/F2-report.md`
@@ -539,7 +539,7 @@ node --check js/gecmis.js && node --check js/degisiklikler/etiketler.js
 | `HT-UI-09` | `_katTipMap.muayene` yeni tipi içerir, `ureme` içermez |
 | `HT-UI-10` | `_detOzetHtml`: takipsiz yalnız `Takibe al`; açık takipte üçü; çıkmış hayvanda hiçbiri |
 | `HT-UI-11` | Rozetlerde açıklama kaçışlı; `_detChipsHtml` eski çağrı çalışır (`det-kisir-chip`) |
-| `HT-UI-12` | `TARIH_ALANLARI` üç alan `min:'bugun'` taşır, `max` taşımaz; `_DET_TABLOLAR` içerir |
+| `HT-UI-12` | `TARIH_ALANLARI` üç alan `min:'bugun'` taşır, `max` taşımaz; `_DET_TABLOLAR` `hayvan_takip` içerir; kart açıkken `_detAciksaTazele(['hayvan_takip'],...)` tazelemeyi tetikler |
 
 - [ ] **Adım 2:** Kırmızı, uygula, yeşil.
 - [ ] **Adım 3:** Bütün birim süiti: yeni kırmızı yok. Commit.
@@ -567,10 +567,11 @@ ram-ultracode exec --class test --sh "cd $WT && NODE_PATH=$MAIN/node_modules nod
 | `HT-V-01` | Başarı kolu: sahte `openCaseDet` gecikmeli Promise; olay sırası `openCaseDet başladı`, `openCaseDet bitti`, `htVakaSonrasi` ve bir kez. `await` silinince düşer |
 | `HT-V-02` | `caseTakipRetry` kolu: aynı sıra |
 | `HT-V-03` | `htVakaSonrasi` reddederse vaka toast'u korunur, istisna dışarı çıkmaz |
+| `HT-V-06` | İki kolda `openCaseDet` reddederse hata toast'u yok, `_takipAcikHata` ve `create_case` yeniden çağrılmaz, `htVakaSonrasi` yine bir kez |
 | `HT-V-04` | `TAKIP_ACIK` onayı vaka öncesinde kalır: `_takipAcikHata` sırası değişmez; `caseTakipRetry` onaydan sonra çalışır |
 | `HT-V-05` | Kaynak taraması: `submitBulkCase`, `gonder`, `kizginlik` gövdelerinde `htVakaSonrasi` yok |
 
-- [ ] **Adım 2:** Kırmızı, uygula: `if(res?.case_id){ ...; await openCaseDet(res.case_id); await _htVakaSonrasiGuvenli(hayvan.id,res.case_id); }`. `openCaseDet` modalı await'lerden sonra açar (`js/ui.js:12354-12414`); beklenmezse pencere altta kalır. `caseTakipRetry` (`forms.js:869`, `res2`) aynı. `_htVakaSonrasiGuvenli` hata yakalar, `toast` uyarır.
+- [ ] **Adım 2:** Kırmızı, uygula: `if(res?.case_id){ ...; await _vakaSonrasiAkis(hayvan.id,res.case_id); }`. `_vakaSonrasiAkis`: `try{await openCaseDet(caseId)}catch(e){console.warn(...)}`, sonra `await _htVakaSonrasiGuvenli(hayvanId,caseId)`; yoksa red dış `catch`'e düşer, kayıtlı vakaya hata toast'u çıkar ve pencere atlanır. `openCaseDet` modalı await'lerden sonra açar (`js/ui.js:12354-12414`); beklenmezse pencere altta kalır. `caseTakipRetry` (`forms.js:869`, `res2`) aynı sarmalı kullanır. `_htVakaSonrasiGuvenli` hata yakalar, `toast` uyarır.
 - [ ] **Adım 3:** Yeşil, commit.
 
 **## Yazılabilir dosyalar:** `js/forms.js`, `tests/unit/hayvan-takip-vaka.test.js`, `runs/2026-10-31-hayvan-takip/F5-report.md`
@@ -662,7 +663,7 @@ flowchart TD
 - Ölçüt: band ilk ekranda; satır başına kim/neden/kaç gündür dolu; boş hücre oranı 0; eşleşmeyen satır 0; satır başına okunamayan ya da kesilen metin 0.
 - En uzun açıklama (40 karakter) ve üç takipli hayvanla tekrarlanır; satır taşarsa FAIL.
 
-**## Yazılabilir dosyalar:** `runs/2026-10-31-hayvan-takip/U1-report.md`, `runs/2026-10-31-hayvan-takip/kanit/ui-*`. Demo'da yalnız `E2E-HT-UI-` fixture.
+**## Yazılabilir dosyalar:** `runs/2026-10-31-hayvan-takip/U1-report.md`, `runs/2026-10-31-hayvan-takip/kanit/ui-*`. Demo'da yalnız `E2E-HT-UI-` fixture, sahip yetkisine koşullu (R14).
 **## Boyut bütçesi:** Rapor ≤80 satır; betik kanıt klasöründe.
 **## Review: T1**
 **## Run:** `test "$(grep -c '^| [0-9]* | PASS' runs/2026-10-31-hayvan-takip/U1-report.md)" = 26`

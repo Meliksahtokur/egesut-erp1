@@ -67,7 +67,7 @@ pattern_exceptions:
 acceptance:
   - scripts/db-validate.sh her migration icin PASS (--priors tests/db-validation/hayvan_takip_priors.sql + onceki dosyalar)
   - tests/sql/hayvan_takip_kos.sh ile hayvan_takip_test.sql rc=0
-  - tests/sql/hayvan_takip_kos.sh ile hayvan_takip_karsi_test.sql rc=0, KOS_MOD=topla mutant DUSEN tam olarak KR01-KR07 ve KR09
+  - tests/sql/hayvan_takip_kos.sh ile hayvan_takip_karsi_test.sql rc=0, migration'siz (T1 Run) KOS_MOD=topla mutant DUSEN tam olarak KR01-KR07 ve KR09
   - node --test tests/unit/*.test.js yalniz M0'da olculen taban kirmizilari (db46032: 1598/1592/5/1)
   - U1 26/26 PASS ve anlam olcumu
 stop_conditions:
@@ -117,13 +117,13 @@ checkpoint:
 - **tracked paths:** yukarıdaki manifestin `runs/` ve `.crumbs/` dışındaki dosyaları. `docs/plans/` gitignore'dadır, `git add -f` ile eklenir.
 - **local paths:** `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`, `reports/db-validation-*`
 - **docs authority:** T6 spec ve domain-rules; D1 rpc-reference ve ui-map; root bu goal'ün checkpoint'leri. Workers kanonik belleğe yazmaz.
-- **DB authority:** Canlı şema okuması (prod ve demo, yalnız SELECT) T0'da serbest (spec Ö2). **Demo yazma yetkisi (sahip açık talimatı, 2026-10-31):** kapsam yalnız T6: demo'ya migration apply + ROLLBACK'li `demo_klonla`, `db-validate` PASS sonrası. Commit edilen `demo_klonla` dışındaki TRUNCATE, prod işlemi ve kapsam dışı demo yazımı bu yetkiye girmez. **Açık soru (root):** T6 Ö1 COMMIT'li fixture ve U1 `E2E-HT-UI-` fixture bu kapsamda değil; yetki genişlemeden o adımlar koşulmaz. Prod yazma YOK; S1 sahip kapısı. Demo sahip şifresi okunmaz, yazılmaz, değiştirilmez. Canlı şema tek otoritedir.
+- **DB authority:** Canlı şema okuması (prod ve demo, yalnız SELECT) T0'da serbest (spec Ö2). **Demo yazma yetkisi (sahip açık talimatı, 2026-10-31):** kapsam yalnız T6: demo'ya migration apply + yalnız ROLLBACK'li `demo_klonla`, `db-validate` PASS sonrası. Commit edilen `demo_klonla`, başka TRUNCATE, prod işlemi ve kapsam dışı demo yazımı bu yetkiye girmez. **Açık soru (root):** T6 Ö1 COMMIT'li fixture ve U1 `E2E-HT-UI-` fixture bu kapsamda değil; yetki genişlemeden o adımlar koşulmaz. Prod yazma YOK; S1 sahip kapısı. Demo sahip şifresi okunmaz, yazılmaz, değiştirilmez. Canlı şema tek otoritedir.
 - **pattern_refs:** `RPC-WRITE-01`, `MODAL-ROUTER-01`, `FORM-SUBMIT-01`, `TESTING-01`
 - **pattern_exceptions:** `OFFLINE-SYNC-01` uygulanmaz: spec §1 ve §6 çevrimdışı kuyruğu kapsam dışı tutar, yeni RPC'ler online-only kalır.
 - **acceptance commands:**
   - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`.
   - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_test.sql` rc=0.
-  - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, `OZET: 11 PASS`; `KOS_MOD=topla` mutant `DUSEN` tam olarak `KR01-KR07`, `KR09`.
+  - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, `OZET: 11 PASS`; migration'sız (T1 Run) `KOS_MOD=topla` mutant `DUSEN` tam olarak `KR01-KR07`, `KR09`.
   - `node --test tests/unit/*.test.js` (`NODE_PATH` ana checkout): yalnız M0'da ölçülen taban kırmızıları (db46032: 1598/1592/5/1).
   - Değişen JS'te `node --check`; `git diff --check`.
   - U1 26/26 PASS + anlam ölçümü.
