@@ -323,10 +323,10 @@ function _grafikYPay(s) {
 
 // Pay tuvalin yarısında biter: sığmayan ad ortaya en yakın boşluktan iki satıra bölünür, soldan kesilmez. Tooltip tam adı yazar.
 // Yazı tipi Chart.js özel API'si (_getLabelSizes gibi, vendor sabit): options.ticks.font burada çözülmemiş gelir.
-function _grafikYEtiket(v) {
+function _grafikYEtiket(v, i) {
   const ad = String(this.getLabelForValue(v));
   this.ctx.save();
-  this.ctx.font = this._resolveTickFontOptions(v).string;
+  this.ctx.font = this._resolveTickFontOptions(i).string;
   const sigar = this.ctx.measureText(ad).width + _GRAFIK_Y_BOSLUK <= this.chart.width / 2;
   this.ctx.restore();
   if (sigar) return ad;

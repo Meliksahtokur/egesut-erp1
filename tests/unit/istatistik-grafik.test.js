@@ -809,6 +809,14 @@ const yKapsam = (en, ad) => ({
   ctx: { font: '', save() {}, restore() {}, measureText: t => ({ width: t.length * 6 }) },
 });
 
+test('borc_u5_yazi_tipi_tik_indeksiyle_cozulur', () => {
+  const cb = G.zarfGrafikConfig(coklu('saglik_basari'), { tema: TEMA }).options.scales.y.ticks.callback;
+  const istenen = [];
+  const kapsam = Object.assign(yKapsam(348, 'kısa'), { _resolveTickFontOptions: i => { istenen.push(i); return { string: '12px x' }; } });
+  cb.call(kapsam, 7, 2);                                          // değer 7, indeks 2: Chart.js ticks[i] indeksle okur
+  assert.deepStrictEqual(istenen, [2]);
+});
+
 test('borc_u5_uzun_ad_kesilmez_iki_satira_bolunur', () => {
   const cb = G.zarfGrafikConfig(coklu('saglik_basari'), { tema: TEMA }).options.scales.y.ticks.callback;
   const ad = 'CAROFERTIN-E ( alivira ) içeren';                    // 31 × 6 = 186 px; 348/2-14 = 160 px
