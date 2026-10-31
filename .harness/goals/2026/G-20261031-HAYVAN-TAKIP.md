@@ -55,7 +55,7 @@ docs_authority:
   db: write
   propose_only:
     - prod DB apply (S1, sahip kapisi)
-    - R14 disi demo yazimi (T6 O1 fixture, U1 fixture; acik soru)
+    - R14 disi demo yazimi
     - merge ve push (S1, sahip kapisi)
 pattern_refs:
   - RPC-WRITE-01
@@ -117,7 +117,7 @@ checkpoint:
 - **tracked paths:** yukarıdaki manifestin `runs/` ve `.crumbs/` dışındaki dosyaları. `docs/plans/` gitignore'dadır, `git add -f` ile eklenir.
 - **local paths:** `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`, `reports/db-validation-*`
 - **docs authority:** T6 spec ve domain-rules; D1 rpc-reference ve ui-map; root bu goal'ün checkpoint'leri. Workers kanonik belleğe yazmaz.
-- **DB authority:** Canlı şema okuması (prod ve demo, yalnız SELECT) T0'da serbest (spec Ö2). **Demo yazma yetkisi (sahip açık talimatı, 2026-10-31):** kapsam yalnız T6: demo'ya migration apply + yalnız ROLLBACK'li `demo_klonla`, `db-validate` PASS sonrası. Commit edilen `demo_klonla`, başka TRUNCATE, prod işlemi ve kapsam dışı demo yazımı bu yetkiye girmez. **Açık soru (root):** T6 Ö1 COMMIT'li fixture ve U1 `E2E-HT-UI-` fixture bu kapsamda değil; yetki genişlemeden o adımlar koşulmaz. Prod yazma YOK; S1 sahip kapısı. Demo sahip şifresi okunmaz, yazılmaz, değiştirilmez. Canlı şema tek otoritedir.
+- **DB authority:** Canlı şema okuması (prod ve demo, yalnız SELECT) T0'da serbest (spec Ö2). **Demo yazma yetkisi (sahip açık talimatı, 2026-10-31):** kapsam yalnız T6: demo'ya migration apply + yalnız ROLLBACK'li `demo_klonla`, `db-validate` PASS sonrası. Commit edilen `demo_klonla`, başka TRUNCATE, prod işlemi ve kapsam dışı demo yazımı bu yetkiye girmez. **Yetki genişlemesi (sahip, 2026-10-31):** T6 Ö1 ve U1 için yalnız `E2E-HT-O1` ve `E2E-HT-UI-` önekli COMMIT'li fixture yazımı, yalnız demoda. Prod yazma YOK; S1 sahip kapısı. Demo sahip şifresi okunmaz, yazılmaz, değiştirilmez. Canlı şema tek otoritedir.
 - **pattern_refs:** `RPC-WRITE-01`, `MODAL-ROUTER-01`, `FORM-SUBMIT-01`, `TESTING-01`
 - **pattern_exceptions:** `OFFLINE-SYNC-01` uygulanmaz: spec §1 ve §6 çevrimdışı kuyruğu kapsam dışı tutar, yeni RPC'ler online-only kalır.
 - **acceptance commands:**
