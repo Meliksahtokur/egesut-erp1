@@ -93,6 +93,8 @@ function closeM(id) {
   // _modalBackGuard: bu back'in ürettiği popstate, popstate handler'da
   // tüketilir — altındaki modalı/sayfayı yanlışlıkla kapatmasın diye.
   if (history.state?.modal === id) { globalThis._modalBackGuard = true; history.back(); }
+  // Kızgınlık Tedavi işareti de her kapanışta düşer; kalırsa sonraki elle vakanın takip sorusu susar (§20.5).
+  if (id === 'm-disease') globalThis._kizginlikTedaviId = null;
   // Planlı tohumlama bayrağını HER kapanış yolunda bırak (overlay, X, ESC, geri tuşu).
   // Aksi halde bayrak takılı kalır ve bir sonraki NORMAL tohumlama, kapanmış bir
   // planlı göreve yazılmaya çalışılır.

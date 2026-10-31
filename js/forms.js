@@ -807,7 +807,7 @@ async function submitCase(btn) {
   }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
-  const kizginliktan = await _kizginliktenVakaMi(hayvan.id); // §20.5: bağlantı bloğu işareti silmeden önce okunur
+  const kizginlikKayitId = globalThis._kizginlikTedaviId; // closeM m-disease işareti siler; kapanıştan önce oku
   try {
     const res = await rpc('create_case', {
       p_animal_id:  hayvan.id,
@@ -845,12 +845,10 @@ async function submitCase(btn) {
     _drugsCache = [];
     await loadDrugsCache();
     // Kızgınlık tedavi bağlantısı
-    if (globalThis._kizginlikTedaviId && res?.case_id) {
-      const kid = globalThis._kizginlikTedaviId;
-      globalThis._kizginlikTedaviId = null;
+    if (kizginlikKayitId && res?.case_id) {
       try {
         await rpc('kizginlik_tedavi_baglanti_kur', {
-          p_kayit_id: kid,
+          p_kayit_id: kizginlikKayitId,
           p_case_id:  res.case_id
         });
         toast('🔗 Kızgınlık tedaviye bağlandı');
@@ -861,7 +859,7 @@ async function submitCase(btn) {
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
       await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
-      await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id), kizginliktan);
+      await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id), !!kizginlikKayitId);
     }
   } catch (e) {
     // P10: elle vaka aç yolu (create_case) TAKIP_ACIK kapısından geçer (P3b) —
@@ -897,7 +895,7 @@ async function submitCase(btn) {
       await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(() => {});
       if (res2?.case_id) {
         await openDet(hayvan.id);
-        await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id), kizginliktan);
+        await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id), !!kizginlikKayitId);
       }
       return res2;
     };
@@ -905,14 +903,6 @@ async function submitCase(btn) {
     toast(getUserMessage(e), true);
   }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
-}
-
-/** Form kızgınlık "Tedavi"den mi geldi: X işareti silmez, kayıt bu hayvanın olmalı; okunamazsa elle sayılır. */
-async function _kizginliktenVakaMi(hayvanId) {
-  const kid = globalThis._kizginlikTedaviId;
-  if (!kid) return false;
-  try { return (await idbGetAll('kizginlik_log')).some(k => k.id === kid && k.hayvan_id === hayvanId); }
-  catch (e) { console.warn('⚠️ Kızgınlık kaydı okunamadı:', e); return false; }
 }
 
 /** Takip sorusunu vakayı etkilemeden açar (§20.5, spec §6); hata yalnız uyarıdır. */

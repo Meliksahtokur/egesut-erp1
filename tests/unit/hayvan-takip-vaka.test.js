@@ -1,9 +1,10 @@
 // tests/unit/hayvan-takip-vaka.test.js — Hayvan Takip F5: elle tek hayvanlık vakadan sonra açık takipleri soran pencere.
-// Spec §5.5, §6; domain-rules §20.5. forms.js gerçektir; rpc, pull, kart, vaka detayı ve htVakaSonrasi sahtedir.
+// Spec §5.5, §6; domain-rules §20.5. forms.js ve closeM gerçektir; rpc, pull, kart, vaka detayı ve htVakaSonrasi sahtedir.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const path = require('node:path');
 const { loadBrowserModule, makeDomStub, makeElement, extractFunctionSource } = require('./support/loadModule.js');
 const { getDisplayKupe, bugun } = require('../../js/utils/helpers.js');
@@ -13,12 +14,12 @@ const DIZI = ['openCaseDet başladı', 'openCaseDet bitti', 'htVakaSonrasi'];
 const TAKIP_HATA = 'TAKIP_ACIK:{"muayene_tarihi":"2026-10-20"}';
 
 // openCaseDet modalı await'lerden sonra açar (js/ui.js); sahte de gecikmeli çözülür.
-function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, kizginlikKayit = [], idbRed = false } = {}) {
+function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null } = {}) {
   const rec = { olay: [], rpc: [], toast: [], ht: [], takipHata: 0, retry: null };
   const document = makeDomStub();
   const input = (id, val) => { const el = makeElement('input'); el.value = val; document.__setEl(id, el); };
-  input('d-hid', '12345');
-  input('d-disease-id', 'DS-1');
+  const formDoldur = () => { input('d-hid', '12345'); input('d-disease-id', 'DS-1'); };
+  formDoldur();
   document.__setEl('d-disease-cat', makeElement('div'));
   let ilkCreate = true;
 
@@ -43,7 +44,7 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
         return { ok: true, case_id: caseId };
       },
       pullTables: async () => ({ ok: true, failed: [] }),
-      closeM: () => {},
+      history: { state: null, back() {} },
       openDet: async () => { rec.olay.push('openDet'); },
       openCaseDet: async id => {
         rec.olay.push('openCaseDet başladı');
@@ -69,16 +70,14 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
       loadDrugsCache: async () => {},
       getDisplayKupe,
       bugun,
-      idbGetAll: async t => {
-        if (idbRed) throw new Error('idb yok');
-        return t === 'kizginlik_log' ? kizginlikKayit : [];
-      },
+      idbGetAll: async () => [],
       db: {},
     },
   });
   sandbox.navigator.onLine = true;
   sandbox._kizginlikTedaviId = kizginlikId;
-  return { sandbox, rec };
+  vm.runInContext(extractFunctionSource('js/utils/modal.js', 'closeM'), sandbox);
+  return { sandbox, rec, formDoldur };
 }
 
 const hataToastlari = rec => rec.toast.filter(([, hata]) => hata).map(([m]) => m);
@@ -202,39 +201,57 @@ test('HT-V-06c: caseTakipRetry kolunda detay ve pencere birlikte reddederse retr
   assert.strictEqual(createSayisi(rec), 2);
 });
 
-const KAYIT = [{ id: 'K-1', hayvan_id: 'H-1' }];
+const baglantilar = rec => rec.rpc.filter(r => r.ad === 'kizginlik_tedavi_baglanti_kur').map(r => r.p);
 
-test('HT-V-08: kızgınlık Tedavi Aç yolu pencere açmaz; bağlantı ve vaka detayı aynen çalışır', async () => {
-  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', kizginlikKayit: KAYIT });
+test('HT-V-08: kızgınlık Tedavi yolu pencere açmaz; bağlantı, kapanıştan sonra da kurulur; sonraki elle vaka sorar', async () => {
+  const { sandbox, rec, formDoldur } = sahne({ kizginlikId: 'K-1' });
   await sandbox.submitCase(null);
   assert.deepStrictEqual(rec.ht, []);
   assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI.slice(0, 2));
-  assert.deepStrictEqual(rec.rpc.find(r => r.ad === 'kizginlik_tedavi_baglanti_kur').p, { p_kayit_id: 'K-1', p_case_id: 'C-9' });
-  assert.strictEqual(sandbox._kizginlikTedaviId, null, 'mevcut temizlik korunur');
+  assert.deepStrictEqual(baglantilar(rec), [{ p_kayit_id: 'K-1', p_case_id: 'C-9' }]);
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
   assert.deepStrictEqual(hataToastlari(rec), []);
+
+  formDoldur();
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']], 'sonraki elle vaka sorar');
+  assert.strictEqual(baglantilar(rec).length, 1, 'elle vaka eski kayda bağlanmaz');
 });
 
-test('HT-V-08b: kızgınlık yolunun caseTakipRetry kolu da pencere açmaz', async () => {
-  const { sandbox, rec } = sahne({ takipAcik: true, kizginlikId: 'K-1', kizginlikKayit: KAYIT });
+test('HT-V-08b: onaylı kızgınlık vakası pencere açmaz, bağlantı kurmaz (mevcut); sonraki elle vaka sorar', async () => {
+  const { sandbox, rec, formDoldur } = sahne({ takipAcik: true, kizginlikId: 'K-1' });
   await sandbox.submitCase(null);
+  assert.strictEqual(sandbox._kizginlikTedaviId, 'K-1', 'onay beklerken form açık, işaret durur');
   await rec.retry(false);
   assert.deepStrictEqual(rec.ht, []);
   assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI.slice(0, 2));
-});
+  assert.deepStrictEqual(baglantilar(rec), []);
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
 
-test('HT-V-08c: X ile kapanmış formdan kalan işaret başka hayvanın vakasında soruyu susturmaz', async () => {
-  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', kizginlikKayit: [{ id: 'K-1', hayvan_id: 'BASKA' }] });
+  formDoldur();
   await sandbox.submitCase(null);
   assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
-
-  const baskaKayit = sahne({ kizginlikId: 'K-1', kizginlikKayit: [{ id: 'K-2', hayvan_id: 'H-1' }] });
-  await baskaKayit.sandbox.submitCase(null);
-  assert.deepStrictEqual(baskaKayit.rec.ht, [['H-1', 'C-9']], 'hayvanın başka kaydı işareti doğrulamaz');
+  assert.deepStrictEqual(baglantilar(rec), []);
 });
 
-test('HT-V-08d: kızgınlık kaydı okunamazsa elle vaka sayılır, vaka etkilenmez', async () => {
-  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', idbRed: true });
-  await assert.doesNotReject(sandbox.submitCase(null));
-  assert.strictEqual(createSayisi(rec), 1);
+test('HT-V-08c: Tedavi formu X/backdrop ile kapanınca işaret silinir, elle yeni vaka sorar ve bağlanmaz', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1' });
+  sandbox.closeM('m-disease');
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
+  await sandbox.submitCase(null);
   assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  assert.deepStrictEqual(baglantilar(rec), []);
+});
+
+test('HT-V-08d: başka pencere kapanması ve başarısız kayıt işareti silmez; düzeltilen kayıt kızgınlık sayılır', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', createHata: 'BASKA_HATA' });
+  sandbox.closeM('m-insem-degil');
+  assert.strictEqual(sandbox._kizginlikTedaviId, 'K-1');
+  await sandbox.submitCase(null);
+  assert.strictEqual(sandbox._kizginlikTedaviId, 'K-1', 'form açık, işaret durur');
+
+  const ikinci = sahne({ kizginlikId: 'K-1' });
+  await ikinci.sandbox.submitCase(null);
+  assert.deepStrictEqual(ikinci.rec.ht, []);
+  assert.deepStrictEqual(rec.ht, []);
 });
