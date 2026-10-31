@@ -29,9 +29,9 @@
 $ sqlfluff lint --dialect postgres 'supabase/migrations/20261030000001_dogum_kupe_recycle.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table 'supabase/migrations/20261030000001_dogum_kupe_recycle.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash '~/egesut-erp1/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash '~/egesut-erp1/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261030000001_dogum_kupe_recycle.sql'  # db=egesut_val_tmp
-$ timeout 900 bash '~/egesut-erp1/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ timeout 900 bash '~/egesut-erp1/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (data)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261030000001_dogum_kupe_recycle.sql'  # C2 db=egesut_val_tmp (tohumlu)
 ```
 

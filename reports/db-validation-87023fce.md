@@ -31,9 +31,9 @@
 $ sqlfluff lint --dialect postgres 'supabase/migrations/20261005000001_stat_iskelet.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table 'supabase/migrations/20261005000001_stat_iskelet.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash '$SCRATCHPAD/dbv/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash '$SCRATCHPAD/dbv/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000001_stat_iskelet.sql'  # db=egesut_val_tmp
-$ timeout 900 bash '$SCRATCHPAD/dbv/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ timeout 900 bash '$SCRATCHPAD/dbv/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (data)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000001_stat_iskelet.sql'  # C2 db=egesut_val_tmp (tohumlu)
 ```
 

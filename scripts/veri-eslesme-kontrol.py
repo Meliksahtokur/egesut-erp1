@@ -24,6 +24,11 @@ Dört kontrol (her biri alt komut; `hepsi` hepsini koşar):
 yerel ayrıntı dosyaları + sorgular.sql (kanıt). Kapanışta tek satır hüküm:
 `TEMIZ` / `BULGU: <n>` / hata varsa `HATA: <n> sorgu koşulamadı`.
 
+Geçici ağ arızası (curl 28/35, boş yanıt): salt-okuma sarmalı sorgu sınırlı yeniden
+denenir; tükenirse sorgu HATA'ya yazılır, hüküm üretilmez.
+Çıkış kodu: 0 = TEMIZ/BULGU · 2 = PANIK (yazma gerçekten kabul edildi) ·
+3 = BAGLANTI HATASI (guard sınanamadı) ya da hüküm HATA.
+
 Kullanım:
   python3 scripts/veri-eslesme-kontrol.py hepsi
   python3 scripts/veri-eslesme-kontrol.py isaret --ek-isaret eksper
@@ -40,6 +45,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 
 PROD_REF = "zqnexqbdfvbhlxzelzju"
 PROD_TOKFILE = "/home/melik/tools-bank/.env"        # SUPABASE_MANAGEMENT_TOKEN
@@ -69,6 +75,11 @@ DOLDURULAN_FK = [("dogum", "buzagi_id", "hayvanlar", "id")]
 
 MAX_SATIR = 100_000  # PK kümesi çekme eşiği: üstünde tablo atlanır ve raporlanır
 
+# Geçici ağ arızası: toplam deneme üst sınırı ve denemeler arası bekleme (sn).
+GECICI_CURL = {28, 35}
+GERI_CEKILME = (5, 15, 30)
+RC_PANIK, RC_BAGLANTI = 2, 3
+
 
 def read_env(path, key):
     txt = pathlib.Path(path).read_text()
@@ -85,21 +96,35 @@ class Db:
         self.tag, self.ref, self.token = tag, ref, token
         self.proof = open(cikti_dir / "sorgular.sql", "a", encoding="utf-8")
         self.errors = []
+        self.yeniden_deneme = 0
+
+    def post_salt_okuma(self, query, max_time):
+        """`BEGIN READ ONLY` sarmalı tek sorgu; geçici arızada sınırlı yeniden deneme."""
+        body = json.dumps({"query": query})
+        for bekle in (*GERI_CEKILME, None):
+            r = subprocess.run(
+                ["curl", "-sS", "-X", "POST",
+                 f"https://api.supabase.com/v1/projects/{self.ref}/database/query",
+                 "-H", f"Authorization: Bearer {self.token}",
+                 "-H", "Content-Type: application/json",
+                 "-d", body, "--max-time", str(max_time)],
+                capture_output=True, text=True)
+            if r.returncode not in GECICI_CURL and r.stdout.strip():
+                return r
+            if bekle is None:
+                return r
+            self.yeniden_deneme += 1
+            print(f"[{self.tag}] geçici arıza (curl rc={r.returncode}), {bekle} sn sonra yeniden",
+                  file=sys.stderr, flush=True)
+            time.sleep(bekle)
 
     def sql(self, sql, label=""):
-        body = json.dumps({"query": f"BEGIN READ ONLY; {sql} ROLLBACK;"})
-        r = subprocess.run(
-            ["curl", "-sS", "-X", "POST",
-             f"https://api.supabase.com/v1/projects/{self.ref}/database/query",
-             "-H", f"Authorization: Bearer {self.token}",
-             "-H", "Content-Type: application/json",
-             "-d", body, "--max-time", "180"],
-            capture_output=True, text=True)
+        r = self.post_salt_okuma(f"BEGIN READ ONLY; {sql} ROLLBACK;", 180)
         self.proof.write(f"-- [{self.tag}] {label}\n{sql}\n\n")
         try:
             data = json.loads(r.stdout)
         except Exception:
-            self.errors.append(f"{label}: json parse: {r.stdout[:200]} {r.stderr[:150]}")
+            self.errors.append(f"{label}: curl rc={r.returncode} json parse: {r.stdout[:200]} {r.stderr[:150]}")
             return None
         if isinstance(data, dict) and ("error" in data or "message" in data):
             self.errors.append(f"{label}: {json.dumps(data, ensure_ascii=False)[:250]}")
@@ -117,20 +142,25 @@ class Db:
 
 
 def selftest_readonly(db):
-    """READ ONLY guard kanıtı: yazma denemesi REDDEDİLMELİ. Başarırsa dur."""
-    body = json.dumps({"query": "BEGIN READ ONLY; CREATE TEMP TABLE _ro_guard(i int); ROLLBACK;"})
-    r = subprocess.run(
-        ["curl", "-sS", "-X", "POST",
-         f"https://api.supabase.com/v1/projects/{db.ref}/database/query",
-         "-H", f"Authorization: Bearer {db.token}",
-         "-H", "Content-Type: application/json",
-         "-d", body, "--max-time", "60"],
-        capture_output=True, text=True)
+    """READ ONLY guard kanıtı: yazma denemesi REDDEDİLMELİ. Başarırsa dur.
+
+    PANIK yalnız sunucu sorguyu BAŞARIYLA yanıtlarsa (satır listesi); bağlantı/API
+    hatası yazma kanıtı değildir, guard sınanamamış sayılır.
+    """
+    r = db.post_salt_okuma("BEGIN READ ONLY; CREATE TEMP TABLE _ro_guard(i int); ROLLBACK;", 60)
     out = r.stdout
     if "read-only" in out:
         return True
-    print(f"PANIK: [{db.tag}] READ ONLY guard çalışmıyor — yazma kabul edildi!: {out[:200]}")
-    sys.exit(2)
+    try:
+        basarili = r.returncode == 0 and isinstance(json.loads(out), list)
+    except ValueError:
+        basarili = False
+    if basarili:
+        print(f"PANIK: [{db.tag}] READ ONLY guard çalışmıyor — yazma kabul edildi!: {out[:200]}")
+        sys.exit(RC_PANIK)
+    print(f"BAGLANTI HATASI: [{db.tag}] READ ONLY guard sınanamadı (yazma kabulü ölçülemedi, hüküm üretilmedi): "
+          f"curl rc={r.returncode} {out[:200]} {r.stderr[:150]}")
+    sys.exit(RC_BAGLANTI)
 
 
 def qident(name):
@@ -507,6 +537,7 @@ def main():
 
     hata = len(prod.errors) + len(demo.errors)
     out["hatalar"] = {"prod": prod.errors, "demo": demo.errors}
+    out["yeniden_deneme"] = {"prod": prod.yeniden_deneme, "demo": demo.yeniden_deneme}
     out["hukum"] = (f"HATA: {hata} sorgu koşulamadı" if hata
                     else ("BULGU: " + str(bulgu) if bulgu else "TEMIZ"))
     (cikti / "ozet.json").write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
@@ -514,8 +545,8 @@ def main():
     demo.close()
     print(f"\nÖZET: {cikti / 'ozet.json'}")
     print(f"HÜKÜM: {out['hukum']}")
-    return 0
+    return RC_BAGLANTI if hata else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

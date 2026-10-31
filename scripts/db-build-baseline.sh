@@ -18,7 +18,8 @@
 #
 # Kullanım:
 #   bash scripts/db-build-baseline.sh [--db-name <ad>] [--parite-out <dosya>] [--json]
-#     --db-name     varsayılan egesut_val_tmp
+#     --db-name     varsayılan oturuma benzersiz egesut_val_<pid>_<rastgele> (ad çıktıda/JSON'da
+#                   bildirilir); eşzamanlı oturumlar çakışmaz, yarım kurulumda kendi DB'si silinir
 #     --parite-out  parite özetinin yazılacağı dosya (db-validate.sh okur);
 #                   varsayılan <tmp>/parite.txt
 #     --json        son satırda makine-okur JSON özet
@@ -38,7 +39,7 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
-DB_NAME="egesut_val_tmp"
+DB_NAME=""
 JSON_MODE=0
 PARITE_OUT=""
 VAL_DB_URL=""
@@ -54,6 +55,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+OWN_AUTO_DB=0
+if [[ -z "$DB_NAME" ]]; then
+  DB_NAME="egesut_val_$$_$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+  OWN_AUTO_DB=1
+fi
+
 # Doğrulama MOTORU: varsayılan = aynanın kümesi (yerel PG). --db-url verilirse
 # izole DB'ler o motorda kurulur (ör. Supabase postgres:17 konteyneri — prod ile
 # birebir major sürüm paritesi için). Parite ölçümü de motor üzerinden yapılır.
@@ -65,7 +72,19 @@ if [[ -z "$TMP_ROOT" ]]; then
   exit 78
 fi
 OUT_DIR=$(mktemp -d "$TMP_ROOT/db-baseline.XXXXXXXX")
-trap 'rm -rf "$OUT_DIR"' EXIT
+CREATED_DB=0
+# Yarım kalan kurulum: yalnız bu oturumun ürettiği adı siler; --db-name'e dokunmaz.
+cleanup_baseline() {
+  local rc=$?
+  rm -rf "$OUT_DIR"
+  if [[ $rc -ne 0 && $OWN_AUTO_DB -eq 1 && $CREATED_DB -eq 1 ]]; then
+    dropdb --if-exists "$DB_NAME" || printf '⚠ İzole DB silinemedi: %s\n' "$DB_NAME" >&2
+  fi
+  exit "$rc"
+}
+trap cleanup_baseline EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 # Varsayılan parite dosyası OUT_DIR'de YAŞAMAZ (trap siler; db-validate.sh sonra okur).
 [[ -n "$PARITE_OUT" ]] || PARITE_OUT="$TMP_ROOT/parite-$DB_NAME.txt"
 
@@ -195,6 +214,7 @@ if [[ "$URI_AUTH" == *:* ]]; then export PGPASSWORD="${URI_AUTH#*:}"; fi
 VAL_URL="postgres://${URI_NOPATH}/${DB_NAME}"
 dropdb --if-exists "$DB_NAME"
 createdb "$DB_NAME"
+CREATED_DB=1
 
 # Roller ÖNCE: pg_dump cluster rollerini taşımaz; migration'lar bu rollere
 # GRANT edebiliyor → NOLOGIN yerel karşılıkları şart.

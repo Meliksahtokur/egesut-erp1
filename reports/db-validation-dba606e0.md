@@ -38,13 +38,13 @@
 $ sqlfluff lint --dialect postgres 'supabase/migrations/20261005000005_stat_protokol_disla.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table 'supabase/migrations/20261005000005_stat_protokol_disla.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash '$SCRATCHPAD/t3b-ayna/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash '$SCRATCHPAD/t3b-ayna/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000001_stat_iskelet.sql'  # prior (C1)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000002_v_stat_vaka.sql'  # prior (C1)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000003_stat_tedavi_ozet.sql'  # prior (C1)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000004_stat_tedavi_protokol.sql'  # prior (C1)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000005_stat_protokol_disla.sql'  # db=egesut_val_tmp
-$ timeout 900 bash '$SCRATCHPAD/t3b-ayna/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ timeout 900 bash '$SCRATCHPAD/t3b-ayna/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (data)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000001_stat_iskelet.sql'  # prior (C2)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000002_v_stat_vaka.sql'  # prior (C2)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261005000003_stat_tedavi_ozet.sql'  # prior (C2)

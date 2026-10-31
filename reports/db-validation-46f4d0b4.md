@@ -29,9 +29,9 @@
 $ sqlfluff lint --dialect postgres '/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip/supabase/migrations/20261001000001_takip_yerel_gun_duzeltme.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table '/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip/supabase/migrations/20261001000001_takip_yerel_gun_duzeltme.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash '/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash '~/.herdr/worktrees/egesut-erp1/ovsync-takip/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip/supabase/migrations/20261001000001_takip_yerel_gun_duzeltme.sql'  # db=egesut_val_tmp
-$ timeout 900 bash '/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ timeout 900 bash '~/.herdr/worktrees/egesut-erp1/ovsync-takip/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (data)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip/supabase/migrations/20261001000001_takip_yerel_gun_duzeltme.sql'  # C2 db=egesut_val_tmp (tohumlu)
 ```
 
