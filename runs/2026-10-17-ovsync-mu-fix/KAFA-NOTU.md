@@ -14,6 +14,6 @@
 
 ## Nerede kaldım
 - Prod tamam: 20261030000001, 20261030100001, 20261031000001 (t5, t8; yedekler ~/yedek/prod-yedek-2026-10-31-*)
-- Sıradaki tek adım: faz kapısı review → backup-local-state → ss-merge-gate --apply (some-fixes → main)
+- MERGED a0b2327; sıradaki aday işler board: .ss/some-fixes-BOARD.md
 
 ## Quiz
