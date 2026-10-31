@@ -674,7 +674,7 @@ Bu adımlar sahibin ayrı talimatıyla, ayrı zarfla yürür. Plan bunları koş
 
 1. Sahip testi: link ve U1 listesi. Karar soruları sahibin cümleleriyle.
 2. Prod apply: `.harness/runbooks/db-migration.md` yedi adım; apply, kayıt, GT yenilemesi birlikte; `scripts/veri-eslesme-kontrol.py hepsi`. Apply öncesi (T5 tam gövde yazar): `gorev_tamamla` `md5(prosrc)=90e150e1ac402f7365fbb2d3ca86d27d` ve `proacl` ölçülür, fark varsa dur. Apply sonrası: `prosrc ~ 'HAYVAN_TAKIP_MUAYENE'`. Rollback öncesi aynı gövde karşılaştırması. `has_table_privilege('demo_reader','public.hayvan_takip','SELECT')` ölçülür, yoksa elle GRANT (migration'a yazılmaz).
-3. Ö3b (R10, sahip onaylı spec sapması): `demo/01_fdw_bridge.sql` ile `IMPORT FOREIGN SCHEMA` yenile, `demo_sema_diff()` temiz; `demo_klonla()` `hayvan_takip` satırlarını prod ile eş kopyalar, `ekstra_bosalan`'da yok. Sonuç spec §7 ve §20'ye.
+3. Ö3b (R10, sahip onaylı spec sapması): `demo/01_fdw_bridge.sql` ile `IMPORT FOREIGN SCHEMA` yenile, `demo_sema_diff()` temiz; FDW yenilenince `degisim_log` kapsama girebilir (`GENERATED ALWAYS` `id` nedeniyle klon düşebilir [INFERRED]); önce ROLLBACK'li klonla ölç, demo'da paralel oturum varsa önce ona yaz. `demo_klonla()` `hayvan_takip` satırlarını prod ile eş kopyalar, `ekstra_bosalan`'da yok. Sonuç spec §7 ve §20'ye.
 4. Merge öncesi: `git diff --name-only <T5 merge-base>..main -- supabase/migrations` içinde `gorev_tamamla` taraması (varsa T5 gövdesi yeniden kurulur); en güncel migration damgası; `DB_VER`: main ≥25 ise main+1 (`istatistik-modülü` dalı dahil; `HT-S-11` bunu yakalamaz); `?v=` tek değer ve main'den farklı; dal ucu = kapı commit'i. `git merge --no-commit --no-ff`.
 5. Push: `harness.py push-gate --goal`. Dal kapanışı.
 
