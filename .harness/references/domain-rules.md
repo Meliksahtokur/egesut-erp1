@@ -499,3 +499,14 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     ekranından (genel "ertele" butonu bu tiplerde yok); saat atanabilir, varsayılan SAATSİZ. Dashboard 40 g listesi
     satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
 18. **Hastalık = Ovsync içinde gün (karar 10, sahip 2026-10-13; karar 4/6'nın "alt vaka" kısmı GEÇERSİZ):** inaktif/kist için ayrı vaka AÇILMAZ — `cases.kaynak_vaka_id`, `inaktif_alt_vaka_ac/kapat`, alt-vaka trigger'ı, "dön" akışı YOKTUR. Hastalık günü = `treatment_days` satırı (`disease_id IS NOT NULL`); tekillik DB kısmi unique'idir (`treatment_days_hastalik_gun_uniq`: vaka+hastalık+tarih) — ikinci çağrı mevcut günü döner, ilaç tekrar yazılmaz, ertele tekrarlanmaz. İlaçlar o günün altına `add_drug_administration` ile (PG sarmalı dahil); açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile sorulan gün kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5 aynen); hastalık İnaktif Ovaryum, kist için Kistik Over — tek RPC `ovsync_hastalik_gunu_ekle` (karar 6-7); ön-öneri inaktifte CAROFERTIN-E 20 ml, kistte boş, +İlaç ile eklenebilir (karar 7); pencere TAI gününde biter. Kartta girintili alt-satır, ayrı vaka satırı yok. S4 kartındaki devam rozeti "🦠 Ovsync içinde hastalık günü" der, ebeveyn vaka detayına çıkar (gün id'sine değil); tek günde hastalık adı rozette görünür. Kısır hayvana hastalık günü açılmaz (`KISIR_HAYVANA_HASTALIK_GUNU_YOK`); kısır hard-block (§18.5) aynen.
+
+## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; henüz uygulanmadı)
+
+Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve Ovsync "🔍 takipte" rozetinden AYRI bir kavramdır; üreme akışlarını etkilemez. (§19 başka dalda istatistik için kullanılıyor; çakışmasın diye 20.)
+
+1. **Birden çok takip:** Bir hayvanda aynı anda birden çok açık takip olabilir. Aynı sebepten iki açık takip olamaz; `DIGER` muaftır ve açıklaması zorunludur.
+2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Diğer).
+3. **Dashboard:** En üstte band; hayvan başına tek satır, sebepler yan yana, en eski açık takip üstte.
+4. **Kapatma:** Karttan pencereyle tek tek ya da tümü, isteğe bağlı not. Sürüden çıkan hayvanın bütün takipleri kendiliğinden kapanır.
+5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz.
+6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz: takip sürsün + sonraki muayene ya da takip kapansın. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur.
