@@ -278,6 +278,14 @@ test('HT-V-10: bağlam yalnız m-disease kapanışıyla düşer', () => {
   assert.strictEqual(sandbox._htMuayeneVaka, null);
 });
 
+test('HT-V-10b: closeM m-disease temizliği tek blok; ikisi de birlikte düşer', () => {
+  assert.strictEqual((extractFunctionSource('js/utils/modal.js', 'closeM').match(/if \(id === 'm-disease'\)/g) || []).length, 1);
+  const { sandbox } = sahne({ muayene: MUAYENE, kizginlikId: 'K-1' });
+  sandbox.closeM('m-disease');
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
+  assert.strictEqual(sandbox._htMuayeneVaka, null);
+});
+
 test('HT-V-11: form başka hayvana çevrildiyse vaka açılmaz, bağlam ve düğme kalır', async () => {
   const { sandbox, rec } = sahne({ muayene: { ...MUAYENE, hayvanId: 'H-BASKA' } });
   const btn = makeElement('button');
