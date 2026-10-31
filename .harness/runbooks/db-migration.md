@@ -37,6 +37,16 @@ migrations through the Management API (8/8 OK, 7.3 s), then root read-only
 measurement of live state. Commits: `e3c281e` (apply), `b75d154`
 (merge + root measurement); integrated into main as `6a0edb1`.
 
+## Series apply order
+
+Hayvan Takip (`G-20261031-HAYVAN-TAKIP`), six files, one transaction, in order:
+`20261031200001_hayvan_takip_sema`, `20261031200002_hayvan_takip_rpc`,
+`20261031200003_gorev_tamamla_hayvan_takip`,
+`20261031200004_hayvan_takip_halsizlik_etiket`,
+`20261031200005_hayvan_takip_muayene_vaka`, `20261031200006_hayvan_takip_kilit`.
+`200006` replaces four bodies from `200002`; never stop at `200005`. Files under
+`tests/db-validation/` are validation fixtures and are never applied.
+
 ## Boundaries
 
 - The `schema_migrations` record means "was applied"; it never means

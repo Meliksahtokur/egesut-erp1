@@ -758,11 +758,12 @@ p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarm
 
 ---
 
-## Hayvan Takip (migrations 20261031200001-000005; domain-rules §20)
+## Hayvan Takip (migrations 20261031200001-000006; domain-rules §20)
 
 Migration dosyalarından yazıldı, canlı gövde kanıtı değildir; prod apply sahip kapısında. Beşi de SECURITY DEFINER; EXECUTE `authenticated, service_role`. Tablo `hayvan_takip`te `authenticated`
 yalnız SELECT alır, yazma bu RPC'lerden. Hepsi online-only: `RPC_TABLES`'ta var, `RPC_MAP`'te bilerek yok.
 Çağrı: `js/hayvan-takip-pencere.js` `_htGonder`. Kilit sırası: hayvanlar → hayvan_takip → gorev_log.
+Hayvan satırı `FOR NO KEY UPDATE` (son tanım `20261031200006`; `FOR UPDATE`, FK KEY SHARE tutan oturumla deadlock üretir). Hayvan UPDATE'iyle yine çakışır, çıkış sırası korunur (`tests/sql/hayvan_takip_kilit_test.sh`).
 Hatalar düz metin `RAISE EXCEPTION`; ret sırası parametre → varlık → durum, kodlar aşağıda bu sıradadır.
 
 **`hayvan_takip_ac(p_hayvan_id text, p_sebep_kodu text, p_aciklama text?, p_muayene_tarihi date?, p_muayene_saati time?)`** → jsonb `{ok, takip_id, gorev_id}`

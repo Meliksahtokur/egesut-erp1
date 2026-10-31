@@ -521,6 +521,18 @@ BEGIN
   PERFORM pg_temp.ht_dogru(src ~ 'public\.cases c\s+WHERE[^;]*FOR SHARE;', 'vaka satırı kilitli değil');
   PERFORM pg_temp.ht_dogru(src ~ 'public\.hayvanlar\s+WHERE[^;]*FOR NO KEY UPDATE;', 'hayvan kilidi NO KEY UPDATE değil');
 END $t$);
+-- 20261031200006: dört RPC'de de hayvan kilidi NO KEY UPDATE; takip ve görev kilitleri FOR UPDATE kalır.
+SELECT pg_temp.ht_test('V08b', $t$ DECLARE f regprocedure; src text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['public.hayvan_takip_ac(text,text,text,date,time)', 'public.hayvan_takip_kapat(uuid[],text,uuid)',
+    'public.hayvan_takip_muayene_planla(uuid,date,time)', 'public.hayvan_takip_muayene_sonuc(uuid,text,text,date,time)']::regprocedure[] LOOP
+    src := (SELECT prosrc FROM pg_proc WHERE oid = f);
+    PERFORM pg_temp.ht_dogru(src ~ 'public\.hayvanlar\s+WHERE[^;]*FOR NO KEY UPDATE;', f || ' hayvan kilidi NO KEY UPDATE değil');
+    PERFORM pg_temp.ht_dogru(src !~ 'public\.hayvanlar\s+WHERE[^;]*FOR UPDATE;', f || ' hayvanda FOR UPDATE kaldı');
+  END LOOP;
+  src := (SELECT prosrc FROM pg_proc WHERE oid = 'public.hayvan_takip_muayene_sonuc(uuid,text,text,date,time)'::regprocedure);
+  PERFORM pg_temp.ht_dogru(src ~ 'public\.hayvan_takip WHERE[^;]*FOR UPDATE;' AND src ~ 'public\.gorev_log WHERE[^;]*FOR UPDATE;', 'takip ve görev kilidi değişmiş');
+END $t$);
 -- PG onayından sonra görev ekleme tekrar edilse de çift görev olmaz (kaynak anahtarı).
 SELECT pg_temp.ht_test('V09', $t$ DECLARE h text := pg_temp.ht_hayvan(1); c uuid := pg_temp.ht_vaka(h); s uuid; r1 jsonb; r2 jsonb;
 BEGIN

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# hayvan_takip_muayene_vaka eşzamanlılık testi: kabul DB'den geçici kopyada iki gerçek oturum.
+# Hayvan Takip eşzamanlılık testi: kabul DB'den geçici kopyada iki gerçek oturum.
 #   K1 kapanış önce: bağ bekler, sonra HT_VAKA_UYUMSUZ; görev açık kalır.
 #   K2 bağ önce: kapanış bağın işlemi bitene kadar bekler; bağ kurulur.
 #   K3 vaka kilidi → hayvan FK KEY SHARE tutan oturumla deadlock yok.
-# KILIT_M5=<dosya> 5. migration yerine verilir (mutant). Kabul DB'ye yazmaz; kopya sonda silinir.
+#   K0 200006 yalnız hayvan kilidini değiştirir: ACL, DEFINER, search_path ve kalan gövde aynı.
+#   K4 dört RPC, hayvan FK KEY SHARE tutan oturumu beklemez.
+#   K5 üç RPC, takibi kilitleyip FK KEY SHARE alan oturumla deadlock üretmez.
+#   K6 dört RPC işlem boyunca hayvan yazmasını dışlar (R13 sırası).
+#   K7 açılış sürerken çıkış bekler, yeni takibi de kapatır.
+# KILIT_M5, KILIT_M6=<dosya> 5. ve 6. migration yerine verilir (mutant). Kabul DB'ye yazmaz; kopya sonda silinir.
 set -u
 kok=$(cd "$(dirname "$0")/../.." && pwd)
 m="$kok/supabase/migrations"
@@ -16,6 +21,12 @@ for f in "$m"/2026103120000[1-4]_*.sql "${KILIT_M5:-$m/20261031200005_hayvan_tak
 done
 
 q() { psql "${P[@]}" -d "$db" -v ON_ERROR_STOP=1 -c "$1" 2>&1; }
+HT_FN="pronamespace = 'public'::regnamespace AND (proname LIKE 'hayvan\_takip\_%' OR proname LIKE '\_hayvan\_takip\_%' OR proname = '_trg_hayvan_cikis_takip_kapat')"
+fn_meta() { q "SELECT proname, pg_get_function_arguments(oid), prosecdef, proconfig, proacl, provolatile, prorettype FROM pg_proc WHERE $HT_FN ORDER BY 1, 2"; }
+fn_govde() { q "SELECT proname || E'\n' || prosrc FROM pg_proc WHERE $HT_FN ORDER BY 1, oid"; }
+meta_once=$(fn_meta); govde_once=$(fn_govde)
+{ echo 'BEGIN;'; printf '\\i %s\n' "${KILIT_M6:-$m/20261031200006_hayvan_takip_kilit.sql}"; echo 'COMMIT;'; } | psql "${P[@]}" -d "$db" -v ON_ERROR_STOP=1 -f - >/dev/null || exit 2
+meta_sonra=$(fn_meta); govde_sonra=$(fn_govde)
 id() { printf '00000000-0000-4000-8%03d-%012d' "$1" "$2"; }
 dus=0
 sonuc() { if [ "$2" = "$3" ]; then echo "$1 PASS"; else echo "$1 FAIL: beklenen [$3] gerçek [$2]"; dus=1; fi; }
@@ -62,5 +73,63 @@ a=$(cat "$cikti_a"); rm -f "$cikti_a"
 if printf '%s\n%s\n' "$a" "$b" | grep -q 'deadlock detected'; then k3=deadlock; else k3=yok; fi
 sonuc K3-deadlock "$k3" yok
 sonuc K3-bag "$(printf '%s\n' "$b" | tail -1)" true
+
+# K0: meta aynı; gövdeler yalnız kilit kipinde ayrılır; NO KEY UPDATE 1'den 5'e çıkar.
+[ "$meta_once" = "$meta_sonra" ] && meta=ayni || meta=farkli
+sonuc K0-meta "$meta" ayni
+yalin() { printf '%s\n' "$1" | sed 's/FOR NO KEY UPDATE/FOR UPDATE/'; }
+[ "$(yalin "$govde_once")" = "$(yalin "$govde_sonra")" ] && govde=ayni || govde=farkli
+sonuc K0-govde "$govde" ayni
+sonuc K0-sayi "$(printf '%s\n' "$govde_sonra" | grep -c 'FOR NO KEY UPDATE')" 5
+
+rpc() { # $1 ad, $2 senaryo no
+  case "$1" in
+    ac)     echo "SELECT public.hayvan_takip_ac('$(id "$2" 1)', 'ZAYIFLAMA') ->> 'ok';" ;;
+    kapat)  echo "SELECT public.hayvan_takip_kapat(ARRAY['$(id "$2" 3)']::uuid[]) ->> 'ok';" ;;
+    planla) echo "SELECT public.hayvan_takip_muayene_planla('$(id "$2" 3)', CURRENT_DATE + 9) ->> 'ok';" ;;
+    sonuc)  echo "SELECT public.hayvan_takip_muayene_sonuc('$(id "$2" 4)', 'KAPANSIN') ->> 'ok';" ;;
+  esac
+}
+
+n=10
+for ad in ac kapat planla sonuc; do
+  n=$((n + 1)); kur "$n"
+  q "BEGIN; SELECT 1 FROM public.hayvanlar WHERE id = '$(id "$n" 1)' FOR KEY SHARE; SELECT pg_sleep(1); COMMIT;" >/dev/null &
+  sleep 0.3
+  t0=$(date +%s%N)
+  c=$(q "$(rpc "$ad" "$n")")
+  gecen=$(( ($(date +%s%N) - t0) / 1000000 )); wait
+  [ "$gecen" -lt 500 ] && bekledi=hayir || bekledi="evet(${gecen}ms)"
+  sonuc "K4-$ad-bekleme" "$bekledi" hayir
+  sonuc "K4-$ad-ok" "$c" true
+done
+
+for ad in kapat planla sonuc; do
+  n=$((n + 1)); kur "$n"
+  cikti_a="$(mktemp -p "${TMPDIR:-$HOME/tmp}")"
+  q "BEGIN; SELECT 1 FROM public.hayvan_takip WHERE id = '$(id "$n" 3)' FOR UPDATE; SELECT pg_sleep(0.8);
+     SELECT 1 FROM public.hayvanlar WHERE id = '$(id "$n" 1)' FOR KEY SHARE; COMMIT;" >"$cikti_a" 2>&1 &
+  sleep 0.3
+  b=$(psql "${P[@]}" -d "$db" -c "SET deadlock_timeout = '300ms'; $(rpc "$ad" "$n")" 2>&1); wait
+  a=$(cat "$cikti_a"); rm -f "$cikti_a"
+  if printf '%s\n%s\n' "$a" "$b" | grep -q 'deadlock detected'; then k5=deadlock; else k5=yok; fi
+  sonuc "K5-$ad-deadlock" "$k5" yok
+  sonuc "K5-$ad-ok" "$(printf '%s\n' "$b" | tail -1)" true
+done
+
+for ad in ac kapat planla sonuc; do
+  n=$((n + 1)); kur "$n"
+  q "BEGIN; $(rpc "$ad" "$n") SELECT pg_sleep(0.8); COMMIT;" >/dev/null &
+  sleep 0.3
+  if q "SELECT 1 FROM public.hayvanlar WHERE id = '$(id "$n" 1)' FOR NO KEY UPDATE NOWAIT" | grep -q 'could not obtain lock'; then k6=dislar; else k6=dislamaz; fi
+  wait
+  sonuc "K6-$ad" "$k6" dislar
+done
+
+n=$((n + 1)); kur "$n"
+q "BEGIN; $(rpc ac "$n") SELECT pg_sleep(0.8); COMMIT;" >/dev/null &
+sleep 0.3
+q "UPDATE public.hayvanlar SET durum = 'Ölü' WHERE id = '$(id "$n" 1)'" >/dev/null; wait
+sonuc K7-acik-takip "$(q "SELECT count(*) FROM public.hayvan_takip WHERE hayvan_id = '$(id "$n" 1)' AND kapanis_tarihi IS NULL")" 0
 
 exit "$dus"
