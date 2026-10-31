@@ -227,6 +227,16 @@ const PG_HATA_SOZLUGU = {
   'PROTOKOL_IPTAL_EDILEMEZ': 'Protokol vakası iptal edilemedi — vaka kapalı ya da protokol vakası değil.',
 };
 
+// Hayvan Takip (domain-rules §20). Sebep DB'de sınırlanmaz; yeni kod buraya eklenebilir.
+const HAYVAN_TAKIP_GOREV_TIPI = 'HAYVAN_TAKIP_MUAYENE';
+const HAYVAN_TAKIP_SEBEPLER = [
+  { kod: 'TOPALLIK', ad: 'Topallık' },
+  { kod: 'SUT_DUSUSU', ad: 'Süt düşüşü' },
+  { kod: 'ZAYIFLAMA', ad: 'Zayıflama' },
+  { kod: 'ISTAHSIZLIK', ad: 'İştahsızlık' },
+  { kod: 'DIGER', ad: 'Diğer' },
+];
+
 // Tohumlama saat pencereleri (MK1, kapalı aralık, Europe/Istanbul).
 // JS aynası: ui.js erteleme modalı canlı önizlemede DB _tohumlama_pencere ile
 // aynı sonucu vermeli. Asla erkene yuvarlanmaz.
