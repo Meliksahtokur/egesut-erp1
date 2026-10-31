@@ -11,7 +11,6 @@
 const HT_TAZELEME_TABLOLARI = ['hayvan_takip', 'gorev_log', 'islem_log'];
 // Ekrandaki veri bayat demektir: uyarı + pencere kapanır + liste tazelenir (spec §6).
 const HT_BAYAT_VERI = /\bHT_(HAYVAN_AKTIF_DEGIL|TAKIP_KAPALI|TAKIP_YOK|GOREV_KAPALI|GOREV_YOK)\b/;
-
 let _htKapatBaglam = null; // { baglam:'kart'|'vaka', caseId } — htKapatPencere yazar, htKapatGonder okur
 
 /**
@@ -66,13 +65,15 @@ function _htPencereAc(modalId, tarihId) {
 }
 
 /**
- * Listeleri tazeler: tablolar, dashboard, açıksa görev sekmesi. Hata fırlatmaz.
+ * Listeleri tazeler: tablolar, dashboard, açıksa görev sekmesi. Hata fırlatmaz, yalnız uyarır.
  * @param {string[]} [tablolar] Çekilecek tablolar.
  * @returns {Promise<void>}
  */
 async function _htTazele(tablolar = HT_TAZELEME_TABLOLARI) {
   try {
-    await pullTables(tablolar);
+    const sonuc = await pullTables(tablolar);
+    // Ağ ve fetcher hatası reddetmez, failed ile çözülür (api.js _pullTablesNow).
+    if (sonuc?.failed?.length) toast('⚠️ Liste tazelenemedi', true);
     await loadDash();
     if (getState('currentPage') === 'tasks') await loadTasks(_curTaskFilter || 'today');
   } catch (e) {
@@ -95,16 +96,20 @@ async function _htTazele(tablolar = HT_TAZELEME_TABLOLARI) {
  * @rpc hayvan_takip_ac, hayvan_takip_kapat, hayvan_takip_muayene_planla, hayvan_takip_muayene_sonuc
  */
 async function _htGonder(btn, modalId, ad, params, basariMetni, hataOnek = '') {
+  // Bütün düğmeler kilitlenir: sonuç penceresinde SURSUN yoldayken KAPANSIN ikinci RPC olurdu.
+  const dugmeler = [...g(modalId).querySelectorAll('button')];
+  const kilit = acik => dugmeler.concat(btn || []).forEach(d => { d.disabled = !acik; });
   const eskiMetin = btn?.textContent;
-  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  let sonuc;
-  let hata = null;
+  kilit(false);
+  if (btn) btn.textContent = 'Kaydediliyor…';
+  let sonuc, hata = null;
   try {
     sonuc = await rpc(ad, params);
   } catch (e) {
     hata = e;
   }
-  if (btn) { btn.disabled = false; btn.textContent = eskiMetin; }
+  kilit(true);
+  if (btn) btn.textContent = eskiMetin;
   if (hata) {
     toast(`⚠️ ${hataOnek}${htHataMetni(hata)}`, true);
     const bayat = HT_BAYAT_VERI.exec(hata?.message || String(hata));

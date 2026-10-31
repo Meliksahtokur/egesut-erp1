@@ -36,7 +36,7 @@ function eleman(id) {
       }));
     },
   });
-  e.querySelectorAll = () => kutular;
+  e.querySelectorAll = sel => (sel === 'button' ? e.dugmeler || [] : kutular);
   return e;
 }
 
@@ -513,12 +513,64 @@ test('HT-P-14: htMuayeneGonder HT_TAKIP_KAPALI toast + liste tazelenir', async (
   assert.strictEqual(k.dash, 1);
 });
 
-test('HT-P-14c: tazeleme reddi gönderimi bozmaz, uyarı verir', async () => {
-  const k = kur({ pull: () => { throw new Error('ağ'); } });
+test('HT-P-14c: ağ hatası pullTables çözümünde failed döner: uyarı verir, gönderim bozulmaz, dashboard yine yüklenir', async () => {
+  const k = kur({ pull: t => ({ ok: [], failed: [...t] }) });
   hazirAc(k);
   await k.s.htAcGonder(btn());
   assert.match(son(k), /tazelenemedi/);
+  assert.strictEqual(k.toastlar[k.toastlar.length - 1].e, true);
   assert.deepStrictEqual(k.kapanan, ['m-ht-ac']);
+  assert.strictEqual(k.dash, 1);
+});
+
+test('HT-P-14d: kısmi failed de uyarır; failed boşsa uyarı yok; tam red de uyarır', async () => {
+  const kismi = kur({ pull: () => ({ ok: ['gorev_log', 'islem_log'], failed: ['hayvan_takip'] }) });
+  hazirAc(kismi);
+  await kismi.s.htAcGonder(btn());
+  assert.match(son(kismi), /tazelenemedi/);
+  const temiz = kur();
+  hazirAc(temiz);
+  await temiz.s.htAcGonder(btn());
+  assert.ok(!temiz.toastlar.some(t => /tazelenemedi/.test(t.m)));
+  const red = kur({ pull: () => { throw new Error('ağ'); } });
+  hazirAc(red);
+  await red.s.htAcGonder(btn());
+  assert.match(son(red), /tazelenemedi/);
+  assert.deepStrictEqual(red.kapanan, ['m-ht-ac']);
+});
+
+test('HT-P-18: SURSUN yoldayken pencerenin bütün düğmeleri kilitli; KAPANSIN ikinci RPC göndermez, bitince açılır', async () => {
+  let cozum;
+  const k = kur({ gorevler: [gorev('g1')], rpc: () => new Promise(r => { cozum = r; }) });
+  await k.s.htSonucAc('g1');
+  const sursun = btn({ sonuc: 'SURSUN' });
+  const kapansin = btn({ sonuc: 'KAPANSIN' });
+  const iptal = btn();
+  k.g('m-ht-sonuc').dugmeler = [sursun, kapansin, iptal];
+  // Tarayıcıda disabled düğme click üretmez: tıklama bu koşulla modellenir.
+  const tikla = b => (b.disabled ? undefined : k.s.htSonucGonder(b));
+  const ilk = tikla(sursun);
+  await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual([sursun.disabled, kapansin.disabled, iptal.disabled], [true, true, true]);
+  await tikla(kapansin);
+  assert.deepStrictEqual(k.rpcler.map(r => r.p.p_sonuc), ['SURSUN']);
+  assert.strictEqual(sursun.textContent, 'Kaydediliyor…');
+  assert.strictEqual(kapansin.textContent, 'Kaydet', 'yalnız tıklanan düğme metin değiştirir');
+  cozum({ ok: true });
+  await ilk;
+  assert.deepStrictEqual([sursun.disabled, kapansin.disabled, iptal.disabled], [false, false, false]);
+  assert.strictEqual(sursun.textContent, 'Kaydet');
+});
+
+test('HT-P-18b: RPC hatasında pencere açık kalır, bütün düğmeler yeniden açılır', async () => {
+  const k = kur({ gorevler: [gorev('g1')], rpc: () => { throw new Error('HT_GECMIS_TARIH'); } });
+  await k.s.htSonucAc('g1');
+  const sursun = btn({ sonuc: 'SURSUN' });
+  const kapansin = btn({ sonuc: 'KAPANSIN' });
+  k.g('m-ht-sonuc').dugmeler = [sursun, kapansin];
+  await k.s.htSonucGonder(sursun);
+  assert.deepStrictEqual(k.kapanan, []);
+  assert.deepStrictEqual([sursun.disabled, kapansin.disabled], [false, false]);
 });
 
 // ── Tarih alanları ───────────────────────────────────────────
