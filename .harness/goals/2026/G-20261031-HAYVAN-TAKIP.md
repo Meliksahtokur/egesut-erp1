@@ -25,6 +25,8 @@ write_manifest:
   - supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql
   - supabase/migrations/20261031200006_hayvan_takip_kilit.sql
   - supabase/migrations/20261031200007_vaka_sablon_pg_kapi.sql
+  - supabase/migrations/99999999999999_ground_truth.sql
+  - demo/README.md
   - .harness/runbooks/db-migration.md
   - demo/01_fdw_bridge.sql
   - tests/db-validation/hayvan_takip_priors.sql
@@ -141,6 +143,7 @@ checkpoint:
   - U2-düzeltme: `tests/sql/hayvan_takip_kilit_test.sh` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-düzeltme 2: `supabase/migrations/20261031200006_hayvan_takip_kilit.sql`, `tests/db-validation/hayvan_takip_kilit_priors.sql`, `.harness/runbooks/db-migration.md` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-PG (sahip 2026-11-05, §18.8 şablonlu vaka): `supabase/migrations/20261031200007_vaka_sablon_pg_kapi.sql`, `tests/sql/vaka_sablon_pg_kapi_test.sql`, `tests/sql/hayvan_takip_kos.sh`, `tests/unit/vaka-sablon-pg-kapi.test.js` (diğer dosyalar yukarıdaki düğümlerde)
+  - S1 prod (sahip 2026-11-05): `supabase/migrations/99999999999999_ground_truth.sql` (runbook adım 6), `demo/README.md` (Ö3b köprü belgesi)
   - Sonradan eklenen, dalda zaten değişen: `demo/01_fdw_bridge.sql` (demo klon koltuğu), `tests/unit/ileri-gebe-duve-siralama.test.js`, `tests/unit/ovsync-girisler.test.js`, `tests/unit/ovsync-pg-ui.test.js`
   - Plan ve kapanış: `docs/plans/2026-10-31-hayvan-takip-PLAN.md`, bu goal dosyası, `.harness/reports/2026-10-31-hayvan-takip.md`
   - Yerel: `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`
