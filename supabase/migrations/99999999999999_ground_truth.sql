@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════
 -- GROUND TRUTH MIGRATION — REFERANS, CALISTIRMAYIN
--- Tarih: 2026-10-31
+-- Tarih: 2026-11-05
 -- Tum migration'larin birlestirilmis hali, sifirdan kurulum icin referans.
--- Son senkron: 2026-10-31 (20261030000001, 20261030100001, 20261031000001; 4 fonksiyon canli tanimla, uq_hayvanlar_kupe_no cikti; yalniz bu nesneler) — onceki: 2026-10-02 (K2, ovsync takip 6 migration), 2026-09-15 (G1); canli prod salt-okunur envanterle incremental guncelleme
+-- Son senkron: 2026-11-05 (20261031200001..200007 hayvan takip; tablo, kolon, gorunum, 14 fonksiyon, 2 trigger canli tanimla; yalniz bu nesneler, dosya sonu bolum) — onceki: 2026-10-31 (20261030000001, 20261030100001, 20261031000001; 4 fonksiyon canli tanimla, uq_hayvanlar_kupe_no cikti; yalniz bu nesneler) — onceki: 2026-10-02 (K2, ovsync takip 6 migration), 2026-09-15 (G1); canli prod salt-okunur envanterle incremental guncelleme
 -- ═══════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.hayvanlar (
@@ -19997,3 +19997,799 @@ COMMENT ON FUNCTION public._trg_takip_yeni_tohumlama_kapat() IS 'P3a tetikleyici
 COMMENT ON FUNCTION public.gorev_log_cycle_guard() IS 'P3a Gorev B: ref_tohumlama_id dolu gorev, bagli tohumlama Bekliyor/Gebe degilse iptal — TAKIP_MUAYENE MUAF (takip tasarim geregi Bos tohumlamaya baglanir; impl-P2b-DONE.md:118). Diger gorev tiplerinde mevcut davranis birebir.';
 COMMENT ON FUNCTION public.gorev_tamamla(text, text, boolean) IS 'P3b H6: tamamlama dalinda GEBELIK_KONTROL/TAKIP_MUAYENE gorevleri MUAYENE_SONUC_GEREKLI ile reddedilir (kilitsiz guard — kilit sirasi degismedi); gorev yalniz tohumlama_bos_ve_devam muayene yoluyla kapanir. T5 iptal dali + SUTTEN_KESME/padok dallari aynen.';
 COMMENT ON FUNCTION public.tohumlama_bos_ve_devam(text, uuid, text, text, numeric, integer, time without time zone, text, boolean) IS 'P2b sarmal RPC (plan.md:288-297): Bos yolu (p_tohumlama_id) — Boş + OVSYNC/PG/TAKIP tek transaction; muayene yolu (p_muayene_gorev_id: GEBELIK_KONTROL|TAKIP_MUAYENE) — GEBE/OVSYNC/PG/TAKIP/ERTALE (TAKIP_MUAYENE''de TAKIP hariç). p_secim=NULL dry-run (yan etki yok). Kilit: hayvan NKU ILK → tohumlama FU → gorev_log FU (H3). Redler: GIRIS_CIFT_ANLAMLI, MUAYENE_GOREV_TIPI_UYUMSUZ, TOH_SONUCLU, TAKIP_KAPALI, TAKIP_YENIDEN_SECILEMEZ, SECIM_TANIMSIZ, OZELLIK_KAPALI, OVSYNC_SECIM_KISIR/ERKEN, PG_KAPI[:TAKIP_ACIK], TAKIP_ACIK, TAKIP_UZADI, BOS_DUZELTME_KOSUL (cekirdek).';
+
+-- ════════════════════════════════════════════════════════════════
+-- SENKRON 2026-11-05 (S1) — Hayvan Takip: 2026-11-05 09:03 UTC PROD apply edilen 7 migration
+-- Migration'lar: 20261031200001..200007 (schema_migrations=189)
+-- Kapsam: NESNE-BAZLI YAMA (tam regen DEĞİL) — yalnız bu serinin ekledi/değiştirdiği nesneler:
+--   1 tablo (hayvan_takip), 1 kolon (gorev_log.ref_takip_id + FK + kısmi unique indeks),
+--   v_gorev_log_sync (SELECT * yeni kolonları taşır), 2 trigger, 14 fonksiyon (12 yeni + gorev_tamamla, tohumlama_sonuc_bos).
+-- Kaynak: canlı prod pg_catalog (Mgmt API SELECT: pg_get_functiondef, pg_get_triggerdef, pg_get_constraintdef,
+--   pg_indexes, pg_policies, pg_get_viewdef, proacl/relacl; 2026-11-05). Bu bölüm önceki gorev_tamamla,
+--   tohumlama_sonuc_bos ve v_gorev_log_sync tanımlarının yerine geçer (dosya sırası = efektif durum).
+-- Yayın: hayvan_takip supabase_realtime üyesi (200001 DO bloğu).
+-- ════════════════════════════════════════════════════════════════
+
+-- ── 1. TABLO hayvan_takip (20261031200001) ──
+CREATE TABLE IF NOT EXISTS public.hayvan_takip (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  farm_id uuid DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e'::uuid NOT NULL,
+  hayvan_id text NOT NULL,
+  sebep_kodu text NOT NULL,
+  aciklama text,
+  acilis_tarihi timestamp with time zone DEFAULT now() NOT NULL,
+  acan text,
+  kapanis_tarihi timestamp with time zone,
+  kapatan text,
+  kapanis_nedeni text,
+  kapanis_notu text,
+  kapatan_vaka_id uuid,
+  CONSTRAINT hayvan_takip_hayvan_id_fkey FOREIGN KEY (hayvan_id) REFERENCES hayvanlar(id),
+  CONSTRAINT hayvan_takip_diger_aciklama_ck CHECK (((sebep_kodu <> 'DIGER'::text) OR (btrim(COALESCE(aciklama, ''::text)) <> ''::text))),
+  CONSTRAINT hayvan_takip_kapanis_cift_ck CHECK (((kapanis_tarihi IS NULL) = (kapanis_nedeni IS NULL))),
+  CONSTRAINT hayvan_takip_kapanis_nedeni_ck CHECK ((kapanis_nedeni = ANY (ARRAY['ELLE'::text, 'MUAYENE'::text, 'VAKA'::text, 'CIKIS'::text]))),
+  CONSTRAINT hayvan_takip_sebep_bos_ck CHECK ((btrim(sebep_kodu) <> ''::text)),
+  CONSTRAINT hayvan_takip_vaka_ref_ck CHECK (((kapanis_nedeni IS DISTINCT FROM 'VAKA'::text) OR (kapatan_vaka_id IS NOT NULL)))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS hayvan_takip_acik_sebep_uq ON public.hayvan_takip USING btree (hayvan_id, sebep_kodu) WHERE ((kapanis_tarihi IS NULL) AND (sebep_kodu <> 'DIGER'::text));
+CREATE INDEX IF NOT EXISTS hayvan_takip_farm_hayvan_idx ON public.hayvan_takip USING btree (farm_id, hayvan_id);
+ALTER TABLE public.hayvan_takip ENABLE ROW LEVEL SECURITY;
+CREATE POLICY hayvan_takip_select ON public.hayvan_takip FOR SELECT TO authenticated USING (true);
+-- canlı relacl: {postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,agent_readonly=r/postgres,demo_reader=r/postgres,authenticated=r/postgres}
+REVOKE ALL ON public.hayvan_takip FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.hayvan_takip TO authenticated;
+GRANT ALL ON public.hayvan_takip TO service_role;
+
+-- ── 2. gorev_log.ref_takip_id (20261031200001) ──
+ALTER TABLE public.gorev_log ADD COLUMN IF NOT EXISTS ref_takip_id uuid;
+ALTER TABLE public.gorev_log ADD CONSTRAINT gorev_log_ref_takip_fk FOREIGN KEY (ref_takip_id) REFERENCES hayvan_takip(id);
+CREATE UNIQUE INDEX IF NOT EXISTS gorev_log_ref_takip_acik_uq ON public.gorev_log USING btree (ref_takip_id) WHERE ((ref_takip_id IS NOT NULL) AND (tamamlandi IS NOT TRUE) AND (iptal IS NOT TRUE));
+
+-- ── 3. VIEW v_gorev_log_sync (canlı pg_get_viewdef; ACL değişmedi) ──
+CREATE OR REPLACE VIEW public.v_gorev_log_sync AS
+ SELECT gorev_log.id,
+    gorev_log.hayvan_id,
+    gorev_log.gorev_tipi,
+    gorev_log.aciklama,
+    gorev_log.hedef_tarih,
+    gorev_log.tamamlandi,
+    gorev_log.tamamlanma_tarihi,
+    gorev_log.padok_hedef,
+    gorev_log.stok_id,
+    gorev_log.miktar,
+    gorev_log.stok_dusuldu,
+    gorev_log.kaynak,
+    gorev_log.created_at,
+    gorev_log.parent_id,
+    gorev_log.iptal,
+    gorev_log.hekim_id,
+    gorev_log.ref_tohumlama_id,
+    gorev_log.etken_kod,
+    gorev_log.kapatan_ref,
+    gorev_log.protokol_instance_id,
+    gorev_log.seans_admin_id,
+    gorev_log.hedef_saat,
+    gorev_log.takip_kapanis_nedeni,
+    gorev_log.ref_takip_id
+   FROM gorev_log
+  WHERE NOT gorev_log.tamamlandi AND NOT gorev_log.iptal
+UNION ALL
+ SELECT kapali.id,
+    kapali.hayvan_id,
+    kapali.gorev_tipi,
+    kapali.aciklama,
+    kapali.hedef_tarih,
+    kapali.tamamlandi,
+    kapali.tamamlanma_tarihi,
+    kapali.padok_hedef,
+    kapali.stok_id,
+    kapali.miktar,
+    kapali.stok_dusuldu,
+    kapali.kaynak,
+    kapali.created_at,
+    kapali.parent_id,
+    kapali.iptal,
+    kapali.hekim_id,
+    kapali.ref_tohumlama_id,
+    kapali.etken_kod,
+    kapali.kapatan_ref,
+    kapali.protokol_instance_id,
+    kapali.seans_admin_id,
+    kapali.hedef_saat,
+    kapali.takip_kapanis_nedeni,
+    kapali.ref_takip_id
+   FROM ( SELECT gorev_log.id,
+            gorev_log.hayvan_id,
+            gorev_log.gorev_tipi,
+            gorev_log.aciklama,
+            gorev_log.hedef_tarih,
+            gorev_log.tamamlandi,
+            gorev_log.tamamlanma_tarihi,
+            gorev_log.padok_hedef,
+            gorev_log.stok_id,
+            gorev_log.miktar,
+            gorev_log.stok_dusuldu,
+            gorev_log.kaynak,
+            gorev_log.created_at,
+            gorev_log.parent_id,
+            gorev_log.iptal,
+            gorev_log.hekim_id,
+            gorev_log.ref_tohumlama_id,
+            gorev_log.etken_kod,
+            gorev_log.kapatan_ref,
+            gorev_log.protokol_instance_id,
+            gorev_log.seans_admin_id,
+            gorev_log.hedef_saat,
+            gorev_log.takip_kapanis_nedeni,
+            gorev_log.ref_takip_id
+           FROM gorev_log
+          WHERE gorev_log.tamamlandi OR gorev_log.iptal
+          ORDER BY gorev_log.created_at DESC NULLS LAST
+         LIMIT 300) kapali;
+
+-- ── 4. FONKSİYONLAR (canlı pg_get_functiondef; 14 adet) ──
+
+-- FUNCTION: public._hayvan_takip_kullanici()
+CREATE OR REPLACE FUNCTION public._hayvan_takip_kullanici()
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_claims jsonb;
+BEGIN
+  BEGIN
+    v_claims := NULLIF(current_setting('request.jwt.claims', true), '')::jsonb;
+  EXCEPTION WHEN others THEN
+    v_claims := NULL;
+  END;
+  RETURN COALESCE(NULLIF(v_claims ->> 'email', ''), NULLIF(v_claims ->> 'sub', ''), session_user::text);
+END;
+$function$;
+
+-- FUNCTION: public._hayvan_takip_sebep_etiket(p_kod text)
+CREATE OR REPLACE FUNCTION public._hayvan_takip_sebep_etiket(p_kod text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT CASE p_kod
+    WHEN 'TOPALLIK' THEN 'Topallık'
+    WHEN 'SUT_DUSUSU' THEN 'Süt düşüşü'
+    WHEN 'ZAYIFLAMA' THEN 'Zayıflama'
+    WHEN 'ISTAHSIZLIK' THEN 'İştahsızlık'
+    WHEN 'HALSIZLIK' THEN 'Halsizlik'
+    WHEN 'DIGER' THEN 'Diğer'
+    ELSE p_kod
+  END;
+$function$;
+
+-- FUNCTION: public._hayvan_takip_gorev_yaz(p_takip uuid, p_hayvan text, p_sebep text, p_tarih date, p_saat time without time zone)
+CREATE OR REPLACE FUNCTION public._hayvan_takip_gorev_yaz(p_takip uuid, p_hayvan text, p_sebep text, p_tarih date, p_saat time without time zone)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_gorev_id uuid;
+BEGIN
+  INSERT INTO public.gorev_log (hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, kaynak, ref_takip_id)
+  VALUES (p_hayvan, 'HAYVAN_TAKIP_MUAYENE', public._hayvan_takip_sebep_etiket(p_sebep) || ' takibi muayenesi',
+          p_tarih, p_saat, 'HAYVAN_TAKIP:' || p_takip::text, p_takip)
+  RETURNING id INTO v_gorev_id;
+  RETURN v_gorev_id;
+END;
+$function$;
+
+-- FUNCTION: public._hayvan_takip_kapat_ic(p_takip_id uuid, p_neden text, p_kapatan text, p_not text, p_vaka uuid)
+CREATE OR REPLACE FUNCTION public._hayvan_takip_kapat_ic(p_takip_id uuid, p_neden text, p_kapatan text, p_not text, p_vaka uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_takip public.hayvan_takip%ROWTYPE;
+BEGIN
+  UPDATE public.hayvan_takip
+     SET kapanis_tarihi = now(), kapanis_nedeni = p_neden, kapatan = p_kapatan,
+         kapanis_notu = p_not, kapatan_vaka_id = p_vaka
+   WHERE id = p_takip_id AND kapanis_tarihi IS NULL
+  RETURNING * INTO v_takip;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.gorev_log
+     SET iptal = true, kapatan_ref = 'hayvan-takip-kapandi'
+   WHERE ref_takip_id = p_takip_id AND tamamlandi IS NOT TRUE AND iptal IS NOT TRUE;
+
+  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+  VALUES ('HAYVAN_TAKIP_KAPANDI', v_takip.hayvan_id, p_takip_id::text, 'hayvan_takip',
+          jsonb_build_object('sebep_kodu', v_takip.sebep_kodu, 'aciklama', v_takip.aciklama,
+                             'kapanis_nedeni', p_neden, 'kapatan', p_kapatan, 'kapatan_vaka_id', p_vaka),
+          p_not);
+  RETURN true;
+END;
+$function$;
+
+-- FUNCTION: public.hayvan_takip_ac(p_hayvan_id text, p_sebep_kodu text, p_aciklama text, p_muayene_tarihi date, p_muayene_saati time without time zone)
+CREATE OR REPLACE FUNCTION public.hayvan_takip_ac(p_hayvan_id text, p_sebep_kodu text, p_aciklama text DEFAULT NULL::text, p_muayene_tarihi date DEFAULT NULL::date, p_muayene_saati time without time zone DEFAULT NULL::time without time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_durum text;
+  v_kullanici text := public._hayvan_takip_kullanici();
+  v_takip_id uuid;
+  v_gorev_id uuid;
+BEGIN
+  IF btrim(COALESCE(p_sebep_kodu, '')) = '' THEN
+    RAISE EXCEPTION 'HT_SEBEP_BOS';
+  END IF;
+  IF p_sebep_kodu = 'DIGER' AND btrim(COALESCE(p_aciklama, '')) = '' THEN
+    RAISE EXCEPTION 'HT_ACIKLAMA_GEREKLI';
+  END IF;
+  IF p_muayene_saati IS NOT NULL AND p_muayene_tarihi IS NULL THEN
+    RAISE EXCEPTION 'HT_TARIH_GEREKLI';
+  END IF;
+  IF p_muayene_tarihi < (now() AT TIME ZONE 'Europe/Istanbul')::date THEN
+    RAISE EXCEPTION 'HT_GECMIS_TARIH';
+  END IF;
+
+  SELECT durum INTO v_durum FROM public.hayvanlar WHERE id = p_hayvan_id FOR NO KEY UPDATE;
+  IF v_durum IS DISTINCT FROM 'Aktif' THEN
+    RAISE EXCEPTION 'HT_HAYVAN_AKTIF_DEGIL';
+  END IF;
+
+  -- Kısmi unique tek otorite: DIGER muafiyeti indekste durur, burada tekrarlanmaz.
+  BEGIN
+    INSERT INTO public.hayvan_takip (farm_id, hayvan_id, sebep_kodu, aciklama, acan)
+    VALUES (public.current_farm_id(), p_hayvan_id, p_sebep_kodu, p_aciklama, v_kullanici)
+    RETURNING id INTO v_takip_id;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'HT_SEBEP_ZATEN_ACIK';
+  END;
+
+  IF p_muayene_tarihi IS NOT NULL THEN
+    v_gorev_id := public._hayvan_takip_gorev_yaz(v_takip_id, p_hayvan_id, p_sebep_kodu, p_muayene_tarihi, p_muayene_saati);
+  END IF;
+
+  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+  VALUES ('HAYVAN_TAKIP_ACILDI', p_hayvan_id, v_takip_id::text, 'hayvan_takip',
+          jsonb_build_object('sebep_kodu', p_sebep_kodu, 'aciklama', p_aciklama, 'acan', v_kullanici, 'gorev_id', v_gorev_id),
+          p_aciklama);
+
+  RETURN jsonb_build_object('ok', true, 'takip_id', v_takip_id, 'gorev_id', v_gorev_id);
+END;
+$function$;
+
+-- FUNCTION: public.hayvan_takip_kapat(p_takip_ids uuid[], p_not text, p_kapatan_vaka_id uuid)
+CREATE OR REPLACE FUNCTION public.hayvan_takip_kapat(p_takip_ids uuid[], p_not text DEFAULT NULL::text, p_kapatan_vaka_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_hayvan_sayisi int;
+  v_hayvan_id text;
+  v_neden text := CASE WHEN p_kapatan_vaka_id IS NULL THEN 'ELLE' ELSE 'VAKA' END;
+  v_kullanici text := public._hayvan_takip_kullanici();
+  v_takip_id uuid;
+  v_kapanan int := 0;
+BEGIN
+  IF COALESCE(cardinality(p_takip_ids), 0) = 0 THEN
+    RAISE EXCEPTION 'HT_BOS_LISTE';
+  END IF;
+
+  -- Kapalı ve bulunmayan kimlik atlanır (spec §4.4); listede hiç takip yoksa hayvan da yoktur, reddedilir.
+  SELECT count(DISTINCT t.hayvan_id), min(t.hayvan_id)
+    INTO v_hayvan_sayisi, v_hayvan_id
+    FROM public.hayvan_takip t
+   WHERE t.id = ANY (p_takip_ids);
+  IF v_hayvan_sayisi = 0 THEN
+    RAISE EXCEPTION 'HT_TAKIP_YOK';
+  END IF;
+  IF v_hayvan_sayisi > 1 THEN
+    RAISE EXCEPTION 'HT_FARKLI_HAYVAN';
+  END IF;
+  IF p_kapatan_vaka_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.cases c WHERE c.id = p_kapatan_vaka_id AND c.animal_id = v_hayvan_id) THEN
+    RAISE EXCEPTION 'HT_VAKA_UYUMSUZ';
+  END IF;
+
+  PERFORM 1 FROM public.hayvanlar WHERE id = v_hayvan_id FOR NO KEY UPDATE;
+
+  FOREACH v_takip_id IN ARRAY p_takip_ids LOOP
+    IF public._hayvan_takip_kapat_ic(v_takip_id, v_neden, v_kullanici, p_not, p_kapatan_vaka_id) THEN
+      v_kapanan := v_kapanan + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'kapanan', v_kapanan, 'hayvan_id', v_hayvan_id);
+END;
+$function$;
+
+-- FUNCTION: public.hayvan_takip_muayene_planla(p_takip_id uuid, p_tarih date, p_saat time without time zone)
+CREATE OR REPLACE FUNCTION public.hayvan_takip_muayene_planla(p_takip_id uuid, p_tarih date, p_saat time without time zone DEFAULT NULL::time without time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_hayvan_id text;
+  v_durum text;
+  v_takip public.hayvan_takip%ROWTYPE;
+  v_gorev_id uuid;
+BEGIN
+  IF p_tarih IS NULL THEN
+    RAISE EXCEPTION 'HT_TARIH_GEREKLI';
+  END IF;
+  IF p_tarih < (now() AT TIME ZONE 'Europe/Istanbul')::date THEN
+    RAISE EXCEPTION 'HT_GECMIS_TARIH';
+  END IF;
+
+  SELECT hayvan_id INTO v_hayvan_id FROM public.hayvan_takip WHERE id = p_takip_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'HT_TAKIP_YOK';
+  END IF;
+
+  SELECT durum INTO v_durum FROM public.hayvanlar WHERE id = v_hayvan_id FOR NO KEY UPDATE;
+  SELECT * INTO v_takip FROM public.hayvan_takip WHERE id = p_takip_id FOR UPDATE;
+
+  IF v_takip.kapanis_tarihi IS NOT NULL THEN
+    RAISE EXCEPTION 'HT_TAKIP_KAPALI';
+  END IF;
+  IF v_durum IS DISTINCT FROM 'Aktif' THEN
+    RAISE EXCEPTION 'HT_HAYVAN_AKTIF_DEGIL';
+  END IF;
+
+  UPDATE public.gorev_log
+     SET hedef_tarih = p_tarih, hedef_saat = p_saat
+   WHERE ref_takip_id = p_takip_id AND tamamlandi IS NOT TRUE AND iptal IS NOT TRUE
+  RETURNING id INTO v_gorev_id;
+  IF FOUND THEN
+    RETURN jsonb_build_object('ok', true, 'gorev_id', v_gorev_id, 'yeni', false);
+  END IF;
+
+  v_gorev_id := public._hayvan_takip_gorev_yaz(p_takip_id, v_hayvan_id, v_takip.sebep_kodu, p_tarih, p_saat);
+  RETURN jsonb_build_object('ok', true, 'gorev_id', v_gorev_id, 'yeni', true);
+END;
+$function$;
+
+-- FUNCTION: public.hayvan_takip_muayene_sonuc(p_gorev_id uuid, p_sonuc text, p_not text, p_sonraki_tarih date, p_sonraki_saat time without time zone)
+CREATE OR REPLACE FUNCTION public.hayvan_takip_muayene_sonuc(p_gorev_id uuid, p_sonuc text, p_not text DEFAULT NULL::text, p_sonraki_tarih date DEFAULT NULL::date, p_sonraki_saat time without time zone DEFAULT NULL::time without time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_gorev public.gorev_log%ROWTYPE;
+  v_takip public.hayvan_takip%ROWTYPE;
+  v_kullanici text := public._hayvan_takip_kullanici();
+  v_yeni_gorev_id uuid;
+  v_kapandi boolean := false;
+BEGIN
+  IF p_sonuc IS NULL OR p_sonuc NOT IN ('SURSUN', 'KAPANSIN') THEN
+    RAISE EXCEPTION 'HT_SONUC_GECERSIZ';
+  END IF;
+  -- Sonraki tarih yalnız SURSUN'da anlamlıdır; KAPANSIN'de yok sayılır.
+  IF p_sonuc = 'SURSUN' THEN
+    IF p_sonraki_saat IS NOT NULL AND p_sonraki_tarih IS NULL THEN
+      RAISE EXCEPTION 'HT_TARIH_GEREKLI';
+    END IF;
+    IF p_sonraki_tarih < (now() AT TIME ZONE 'Europe/Istanbul')::date THEN
+      RAISE EXCEPTION 'HT_GECMIS_TARIH';
+    END IF;
+  END IF;
+
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'HT_GOREV_YOK';
+  END IF;
+  IF v_gorev.gorev_tipi IS DISTINCT FROM 'HAYVAN_TAKIP_MUAYENE' THEN
+    RAISE EXCEPTION 'HT_GOREV_TIP_UYUMSUZ';
+  END IF;
+  IF v_gorev.ref_takip_id IS NULL THEN
+    RAISE EXCEPTION 'HT_TAKIP_YOK';
+  END IF;
+
+  PERFORM 1 FROM public.hayvanlar
+    WHERE id = (SELECT t.hayvan_id FROM public.hayvan_takip t WHERE t.id = v_gorev.ref_takip_id)
+    FOR NO KEY UPDATE;
+  SELECT * INTO v_takip FROM public.hayvan_takip WHERE id = v_gorev.ref_takip_id FOR UPDATE;
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id FOR UPDATE;
+
+  IF v_gorev.tamamlandi IS TRUE OR v_gorev.iptal IS TRUE THEN
+    RAISE EXCEPTION 'HT_GOREV_KAPALI';
+  END IF;
+  IF v_takip.kapanis_tarihi IS NOT NULL THEN
+    RAISE EXCEPTION 'HT_TAKIP_KAPALI';
+  END IF;
+
+  UPDATE public.gorev_log SET tamamlandi = true, tamamlanma_tarihi = now() WHERE id = p_gorev_id;
+
+  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+  VALUES ('HAYVAN_TAKIP_MUAYENE', v_takip.hayvan_id, v_takip.id::text, 'hayvan_takip',
+          jsonb_build_object('sebep_kodu', v_takip.sebep_kodu, 'aciklama', v_takip.aciklama, 'sonuc', p_sonuc,
+                             'gorev_id', p_gorev_id, 'kullanici', v_kullanici),
+          p_not);
+
+  IF p_sonuc = 'KAPANSIN' THEN
+    v_kapandi := public._hayvan_takip_kapat_ic(v_takip.id, 'MUAYENE', v_kullanici, p_not, NULL);
+  ELSIF p_sonraki_tarih IS NOT NULL THEN
+    v_yeni_gorev_id := public._hayvan_takip_gorev_yaz(v_takip.id, v_takip.hayvan_id, v_takip.sebep_kodu, p_sonraki_tarih, p_sonraki_saat);
+  END IF;
+
+  RETURN jsonb_build_object('ok', true, 'sonuc', p_sonuc, 'takip_id', v_takip.id,
+                            'yeni_gorev_id', v_yeni_gorev_id, 'kapandi', v_kapandi);
+END;
+$function$;
+
+-- FUNCTION: public.hayvan_takip_muayene_vaka(p_gorev_id uuid, p_case_id uuid, p_not text)
+CREATE OR REPLACE FUNCTION public.hayvan_takip_muayene_vaka(p_gorev_id uuid, p_case_id uuid, p_not text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_gorev public.gorev_log%ROWTYPE;
+  v_takip public.hayvan_takip%ROWTYPE;
+  v_kullanici text := public._hayvan_takip_kullanici();
+  v_kapandi boolean;
+BEGIN
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'HT_GOREV_YOK';
+  END IF;
+  IF v_gorev.gorev_tipi IS DISTINCT FROM 'HAYVAN_TAKIP_MUAYENE' THEN
+    RAISE EXCEPTION 'HT_GOREV_TIP_UYUMSUZ';
+  END IF;
+  IF v_gorev.ref_takip_id IS NULL THEN
+    RAISE EXCEPTION 'HT_TAKIP_YOK';
+  END IF;
+
+  PERFORM 1 FROM public.hayvanlar
+    WHERE id = (SELECT t.hayvan_id FROM public.hayvan_takip t WHERE t.id = v_gorev.ref_takip_id)
+    FOR NO KEY UPDATE;
+  SELECT * INTO v_takip FROM public.hayvan_takip WHERE id = v_gorev.ref_takip_id FOR UPDATE;
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id FOR UPDATE;
+
+  IF v_gorev.tamamlandi IS TRUE OR v_gorev.iptal IS TRUE THEN
+    RAISE EXCEPTION 'HT_GOREV_KAPALI';
+  END IF;
+  IF v_takip.kapanis_tarihi IS NOT NULL THEN
+    RAISE EXCEPTION 'HT_TAKIP_KAPALI';
+  END IF;
+  -- Paylaşımlı kilit: bağ bitene kadar vaka kapanamaz; kapanış bekliyorsa bu sorgu kapanmış satırı görür.
+  PERFORM 1 FROM public.cases c
+    WHERE c.id = p_case_id AND c.animal_id = v_takip.hayvan_id AND c.status = 'active'
+    FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'HT_VAKA_UYUMSUZ';
+  END IF;
+
+  UPDATE public.gorev_log SET tamamlandi = true, tamamlanma_tarihi = now() WHERE id = p_gorev_id;
+
+  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+  VALUES ('HAYVAN_TAKIP_MUAYENE', v_takip.hayvan_id, v_takip.id::text, 'hayvan_takip',
+          jsonb_build_object('sebep_kodu', v_takip.sebep_kodu, 'aciklama', v_takip.aciklama, 'sonuc', 'VAKA',
+                             'gorev_id', p_gorev_id, 'kullanici', v_kullanici, 'kapatan_vaka_id', p_case_id),
+          p_not);
+
+  v_kapandi := public._hayvan_takip_kapat_ic(v_takip.id, 'VAKA', v_kullanici, p_not, p_case_id);
+
+  RETURN jsonb_build_object('ok', true, 'sonuc', 'VAKA', 'takip_id', v_takip.id, 'case_id', p_case_id, 'kapandi', v_kapandi);
+END;
+$function$;
+
+-- FUNCTION: public._trg_hayvan_cikis_takip_kapat()
+CREATE OR REPLACE FUNCTION public._trg_hayvan_cikis_takip_kapat()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  PERFORM public._hayvan_takip_kapat_ic(t.id, 'CIKIS', 'sistem', NULL, NULL)
+    FROM public.hayvan_takip t
+   WHERE t.hayvan_id = NEW.id AND t.kapanis_tarihi IS NULL;
+  RETURN NEW;
+END;
+$function$;
+
+-- FUNCTION: public._tohumlama_bos_cekirdek(p_tohumlama_id text, p_gerekce text)
+CREATE OR REPLACE FUNCTION public._tohumlama_bos_cekirdek(p_tohumlama_id text, p_gerekce text DEFAULT NULL::text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- Boş yazımı: tohumlama + hayvan Boş, açık GEBELIK_KONTROL/TOHUMLAMA_HAZIRLIK iptal, islem_log TOHUMLAMA_SONUC.
+-- Döner: islem_id; hayvan Aktif değilse NULL (yazma yok). Sonuç denetimi çağırandadır.
+DECLARE v_toh record; v_islem_id text := gen_random_uuid()::text; v_onceki_durum text; v_iptal text[];
+BEGIN
+  SELECT * INTO v_toh FROM public.tohumlama WHERE id::text = p_tohumlama_id;
+  SELECT tohumlama_durumu INTO v_onceki_durum FROM public.hayvanlar WHERE id = v_toh.hayvan_id AND durum = 'Aktif';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  UPDATE public.tohumlama SET sonuc = 'Boş' WHERE id::text = p_tohumlama_id;
+  UPDATE public.hayvanlar SET tohumlama_durumu = 'Boş' WHERE id = v_toh.hayvan_id;
+  WITH u AS (UPDATE public.gorev_log SET iptal = true
+              WHERE hayvan_id = v_toh.hayvan_id AND gorev_tipi IN ('GEBELIK_KONTROL', 'TOHUMLAMA_HAZIRLIK')
+                AND NOT tamamlandi AND NOT iptal RETURNING id::text)
+  SELECT COALESCE(array_agg(id), '{}') INTO v_iptal FROM u;
+  INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+  VALUES (v_islem_id, 'TOHUMLAMA_SONUC', v_toh.hayvan_id, p_tohumlama_id, 'tohumlama',
+    jsonb_build_object('olusturulan', '[]'::jsonb,
+      'guncellenen', jsonb_build_array(
+        jsonb_build_object('tablo', 'tohumlama', 'id', p_tohumlama_id, 'onceki', jsonb_build_object('sonuc', v_toh.sonuc)),
+        jsonb_build_object('tablo', 'hayvanlar', 'id', v_toh.hayvan_id, 'onceki', jsonb_build_object('tohumlama_durumu', v_onceki_durum))),
+      'iptal_gorevler', to_jsonb(v_iptal), 'iptal_sebep', 'bos')
+    || jsonb_strip_nulls(jsonb_build_object('gerekce', p_gerekce)));
+  RETURN v_islem_id;
+END;
+$function$;
+
+-- FUNCTION: public.tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text, p_baslangic_tarihi date)
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text, p_baslangic_tarihi date DEFAULT NULL::date)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- §18.8 şablonlu vaka: kapı onayı = Boş + seçilen plan, tek işlem. Ret: PG_KAPI_BOS_ATA:<SEBEP>:<json>.
+DECLARE
+  v_hayvan text; v_son record; v_islem text; v_r jsonb;
+  v_d jsonb := jsonb_build_object('case_id', p_case_id, 'sablon_id', p_sablon_id, 'tohumlama_id', p_tohumlama_id);
+BEGIN
+  IF btrim(COALESCE(p_gerekce, '')) = '' THEN RAISE EXCEPTION 'PG_KAPI_BOS_ATA:GEREKCE_GEREKLI:%', v_d; END IF;
+  SELECT animal_id INTO v_hayvan FROM public.cases WHERE id = p_case_id AND status = 'active';
+  IF NOT FOUND THEN RAISE EXCEPTION 'PG_KAPI_BOS_ATA:VAKA_YOK:%', v_d; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.tedavi_sablonu_kalem k WHERE k.sablon_id = p_sablon_id
+                    AND public._pg_urun_durumu(k.stok_id, k.drug_product_id) = 'PG') THEN
+    RAISE EXCEPTION 'PG_KAPI_BOS_ATA:PG_YOK:%', v_d; END IF;
+  PERFORM 1 FROM public.hayvanlar WHERE id = v_hayvan FOR NO KEY UPDATE;
+  SELECT t.id::text AS id, t.sonuc INTO v_son FROM public._son_tohumlama(v_hayvan) t;
+  IF NOT COALESCE(v_son.id = p_tohumlama_id, false) THEN RAISE EXCEPTION 'PG_KAPI_BOS_ATA:TOH_SON_DEGIL:%', v_d; END IF;
+  IF NOT COALESCE(v_son.sonuc = 'Bekliyor', false) THEN
+    RAISE EXCEPTION 'PG_KAPI_BOS_ATA:TOH_SONUCLU:%', v_d || jsonb_build_object('sonuc', v_son.sonuc); END IF;
+  v_islem := public._tohumlama_bos_cekirdek(p_tohumlama_id, btrim(p_gerekce));
+  IF v_islem IS NULL THEN RAISE EXCEPTION 'PG_KAPI_BOS_ATA:HAYVAN_AKTIF_DEGIL:%', v_d; END IF;
+  v_r := public.tedavi_sablon_uygula(p_case_id, p_sablon_id, p_baslangic_tarihi, false, NULL);
+  IF NOT COALESCE((v_r->>'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'PG_KAPI_BOS_ATA:PLAN_RED:%', v_d || jsonb_build_object('mesaj', v_r->>'mesaj'); END IF;
+  PERFORM public._acik_disi_gorev_kur(v_hayvan);
+  RETURN v_r || jsonb_build_object('tohumlama_id', p_tohumlama_id, 'islem_id', v_islem);
+END;
+$function$;
+
+-- FUNCTION: public.tohumlama_sonuc_bos(p_tohumlama_id text, p_notlar text)
+CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_bos(p_tohumlama_id text, p_notlar text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE v_toh record; v_islem_id text;
+BEGIN
+  SELECT * INTO v_toh FROM public.tohumlama WHERE id::text = p_tohumlama_id;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadı'); END IF;
+  IF v_toh.sonuc != 'Bekliyor' THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Sadece Bekliyor durumundaki tohumlama boş ilan edilebilir'); END IF;
+  v_islem_id := public._tohumlama_bos_cekirdek(p_tohumlama_id);
+  IF v_islem_id IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'Hayvan aktif değil'); END IF;
+  -- R3.2 SK8: Boş çıkan açık dişidir — kural fonksiyonuyla görev (bayrak kapalıyken NULL).
+  PERFORM public._acik_disi_gorev_kur(v_toh.hayvan_id);
+  RETURN jsonb_build_object('ok', true, 'islem_id', v_islem_id);
+END;
+$function$;
+
+-- FUNCTION: public.gorev_tamamla(p_gorev_id text, p_padok_hedef text, p_iptal boolean)
+CREATE OR REPLACE FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text DEFAULT NULL::text, p_iptal boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_gorev record; v_hayvan record; v_snapshot jsonb;
+  v_stok_dusuldu boolean := false; v_padok_guncellendi boolean := false;
+  v_olusturulan jsonb := '[]'::jsonb; v_guncellenen jsonb := '[]'::jsonb;
+  v_padok_id uuid;
+  v_hedef_padok text;
+  v_yeni_grup text;
+  v_guard_tip text;
+  v_uygulama_etken text;
+BEGIN
+  -- ═══ P3b H6 guard — MUAYENE_SONUC_GEREKLI (plan.md:407 birebir) ═══
+  -- Yalnız TAMAMLAMA dalı (p_iptal false/NULL) + yalnız muayene tipleri.
+  -- Kilitsiz tek okuma — ilk (kilitli) tablo erişiminden ÖNCE; mevcut kilit
+  -- sırası (gorev_log FOR UPDATE → koşullu hayvanlar FOR UPDATE) DEĞİŞMEZ
+  -- (§10h H1: gorev_tamamla eski yoldur). Görev yalnız muayene sonuc RPC'si
+  -- (tohumlama_bos_ve_devam muayene yolu) üzerinden kapanır (§18.17).
+  -- p_iptal=true dalı (T5 offline-replay iptali) ve SUTTEN_KESME/padok
+  -- dalları bu guard'a GİRMEZ — davranışları aynen korunur.
+  IF p_iptal IS NOT TRUE THEN
+    SELECT gorev_tipi INTO v_guard_tip
+      FROM public.gorev_log
+     WHERE id = p_gorev_id::uuid;
+    IF v_guard_tip IN ('GEBELIK_KONTROL', 'TAKIP_MUAYENE', 'HAYVAN_TAKIP_MUAYENE') THEN
+      RAISE EXCEPTION 'MUAYENE_SONUC_GEREKLI:%', v_guard_tip;
+    END IF;
+  END IF;
+
+  SELECT * INTO v_gorev
+    FROM public.gorev_log
+   WHERE id = p_gorev_id::uuid
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Görev bulunamadı: %', p_gorev_id; END IF;
+
+  -- ═══ T5 branşı (cila 20260925000006) — offline kuyruk replay'i iptal-PATCH'i
+  --     İPTAL olarak kapatır; mevcut mantık ikame EDİLMEZ. Konum: NOT FOUND
+  --     kontrolünün hemen ardından, tamamlandi/iptal erken-dönüşlerinden ÖNCE.
+  --     REVIEW DÜŞÜK-1 düzeltmesi (2026-09-25): tamamlandi-guard'ı — zaten
+  --     tamamlanmış (gerçek tamamlanma) görev, sonradan replay edilen bayat
+  --     iptal-PATCH'le İPTAL'e çevrİLMEZ; erken-dönüşe düşer ('zaten tamamlanmış').
+  --     İç IF NOT FOUND ölü koddur (dış FOR UPDATE zaten raise eder) — kaldırıldı.
+  IF p_iptal IS TRUE AND v_gorev.tamamlandi IS NOT TRUE THEN
+    UPDATE public.gorev_log
+       SET tamamlandi = true,
+           tamamlanma_tarihi = COALESCE(tamamlanma_tarihi, now()),
+           iptal = true
+     WHERE id = p_gorev_id::uuid;
+    INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+    VALUES ('GOREV_TAMAMLA', v_gorev.hayvan_id, p_gorev_id, 'gorev_log',
+            '{"olusturulan":[],"guncellenen":[],"silinen":[]}'::jsonb,
+            'Görev iptal edildi (offline replay)');
+    RETURN jsonb_build_object('ok', true, 'gorev_id', p_gorev_id, 'iptal', true);
+  END IF;
+  IF v_gorev.tamamlandi THEN RETURN jsonb_build_object('ok', true, 'mesaj', 'Görev zaten tamamlanmış'); END IF;
+  IF v_gorev.iptal THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev iptal edilmiş, tamamlanamaz'); END IF;
+
+  -- ═══ K8 köprü (Faz 3): görev tamamlanınca uygulama_log satırı ───────
+  -- İki iptal dönüşünden SONRA (yukarıdaki p_iptal dalı + iptal guardı).
+  -- Dinleyici (trg_dinle_uygulama) bu satırla uyarıyı düşürür; _gorev_dinle
+  -- yalnız açık + iptalsiz görevi kapattığı için tamamlanan görevde idempotent'tir.
+  IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0
+     AND v_gorev.hayvan_id IS NOT NULL THEN
+    v_uygulama_etken := COALESCE(v_gorev.etken_kod, public._etken_kod_bul(v_gorev.stok_id, NULL));
+    INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar)
+    VALUES (v_gorev.hayvan_id, v_gorev.stok_id, v_uygulama_etken, v_gorev.miktar, 'ml', 'IM',
+            'GorevID:' || p_gorev_id);
+  END IF;
+
+  IF v_gorev.gorev_tipi = 'SUTTEN_KESME' AND v_gorev.hayvan_id IS NOT NULL THEN
+    PERFORM public.buzagi_sutten_kesme_onayla(v_gorev.hayvan_id);
+    UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=COALESCE(tamamlanma_tarihi, now())
+      WHERE id=p_gorev_id::uuid AND tamamlandi=false;
+    RETURN jsonb_build_object('ok', true, 'gorev_id', p_gorev_id, 'sutten_kesme', true);
+  END IF;
+
+  v_hedef_padok := COALESCE(NULLIF(btrim(p_padok_hedef), ''), NULLIF(btrim(v_gorev.padok_hedef), ''));
+
+  IF v_gorev.gorev_tipi = 'PADOK_DEGISIM'
+     AND v_gorev.hayvan_id IS NOT NULL
+     AND v_hedef_padok IS NULL THEN
+    RAISE EXCEPTION 'Padok değişim görevinin hedef padoku boş: %', p_gorev_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF v_hedef_padok IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
+    SELECT * INTO v_hayvan
+      FROM public.hayvanlar
+     WHERE id = v_gorev.hayvan_id
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Görevin hayvanı bulunamadı: %', v_gorev.hayvan_id
+        USING ERRCODE = 'foreign_key_violation';
+    ELSE
+      SELECT id INTO v_padok_id
+        FROM public.padoklar
+       WHERE ad = v_hedef_padok;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hedef padok bulunamadı: %', v_hedef_padok
+          USING ERRCODE = 'foreign_key_violation';
+      END IF;
+
+      v_yeni_grup := v_hayvan.grup;
+      IF v_gorev.gorev_tipi = 'PADOK_DEGISIM'
+         AND v_gorev.aciklama ILIKE '%Kuru döneme%' THEN
+        v_yeni_grup := 'Sağmal (Kuru)';
+      END IF;
+
+      IF EXISTS (SELECT 1 FROM public.grup_padok_eslem WHERE grup = v_yeni_grup)
+         AND NOT EXISTS (
+           SELECT 1
+             FROM public.grup_padok_eslem
+            WHERE grup = v_yeni_grup
+              AND padok_id = v_padok_id
+         ) THEN
+        RAISE EXCEPTION 'Grup % için hedef padok geçersiz: %', v_yeni_grup, v_hedef_padok
+          USING ERRCODE = 'check_violation';
+      END IF;
+    END IF;
+  END IF;
+
+  v_guncellenen := v_guncellenen || jsonb_build_object(
+    'tablo','gorev_log','id',p_gorev_id,
+    'onceki', jsonb_build_object('tamamlandi',v_gorev.tamamlandi,'tamamlanma_tarihi',v_gorev.tamamlanma_tarihi),
+    'sonraki', jsonb_build_object('tamamlandi',true,'tamamlanma_tarihi',now())
+  );
+  UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=now() WHERE id=p_gorev_id::uuid;
+
+  -- ASI_PLANLI muaf: planlı görevin stok düşümü yalnız asi_planli_tamamla üzerinden
+  -- olur (plan rezervasyonu + gerçek uygulama); generic 'Görev' satırı çift düşüm olurdu
+  IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0
+     AND v_gorev.gorev_tipi IS DISTINCT FROM 'ASI_PLANLI' THEN
+    v_stok_dusuldu := true;
+    INSERT INTO public.stok_hareket (id,stok_id,tur,miktar,notlar,iptal)
+    VALUES (gen_random_uuid(),v_gorev.stok_id,'Görev',v_gorev.miktar,'GorevID:'||p_gorev_id,false);
+  END IF;
+
+  IF v_hedef_padok IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
+    v_padok_guncellendi := true;
+    v_guncellenen := v_guncellenen || jsonb_build_object(
+      'tablo','hayvanlar','id',v_gorev.hayvan_id,
+      'onceki',jsonb_build_object('grup',v_hayvan.grup,'padok',v_hayvan.padok,'padok_id',v_hayvan.padok_id),
+      'sonraki',jsonb_build_object('grup',v_yeni_grup,'padok',v_hedef_padok,'padok_id',v_padok_id)
+    );
+
+    UPDATE public.hayvanlar
+       SET grup = v_yeni_grup,
+           padok = v_hedef_padok,
+           padok_id = v_padok_id
+     WHERE id = v_gorev.hayvan_id;
+  END IF;
+
+  v_snapshot := jsonb_build_object('olusturulan',v_olusturulan,'guncellenen',v_guncellenen,'silinen','[]'::jsonb);
+  INSERT INTO public.islem_log (tip,ana_hayvan_id,ref_id,ref_tablo,snapshot,kullanici_notu)
+  VALUES ('GOREV_TAMAMLA',v_gorev.hayvan_id,p_gorev_id,'gorev_log',v_snapshot,
+    format('Görev tamamlandı (stok: %s, padok: %s)',
+      CASE WHEN v_stok_dusuldu THEN 'evet' ELSE 'hayır' END,
+      CASE WHEN v_padok_guncellendi THEN 'evet' ELSE 'hayır' END));
+
+  RETURN jsonb_build_object('ok',true,'gorev_id',p_gorev_id,'stok_dusuldu',v_stok_dusuldu,'padok_guncellendi',v_padok_guncellendi);
+END;
+$function$;
+
+-- ── 5. TRIGGER'LAR (canlı pg_get_triggerdef) ──
+CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.hayvan_takip FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
+CREATE TRIGGER trg_hayvan_cikis_takip_kapat AFTER UPDATE OF durum ON public.hayvanlar FOR EACH ROW WHEN (((old.durum = 'Aktif'::text) AND (new.durum IS DISTINCT FROM 'Aktif'::text))) EXECUTE FUNCTION _trg_hayvan_cikis_takip_kapat();
+
+-- ── 6. ACL (canlı proacl aynası; anon/PUBLIC yok) ──
+REVOKE ALL ON FUNCTION public._hayvan_takip_kullanici() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public._hayvan_takip_sebep_etiket(p_kod text) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public._hayvan_takip_gorev_yaz(p_takip uuid, p_hayvan text, p_sebep text, p_tarih date, p_saat time without time zone) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public._hayvan_takip_kapat_ic(p_takip_id uuid, p_neden text, p_kapatan text, p_not text, p_vaka uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.hayvan_takip_ac(p_hayvan_id text, p_sebep_kodu text, p_aciklama text, p_muayene_tarihi date, p_muayene_saati time without time zone) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.hayvan_takip_ac(p_hayvan_id text, p_sebep_kodu text, p_aciklama text, p_muayene_tarihi date, p_muayene_saati time without time zone) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.hayvan_takip_kapat(p_takip_ids uuid[], p_not text, p_kapatan_vaka_id uuid) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.hayvan_takip_kapat(p_takip_ids uuid[], p_not text, p_kapatan_vaka_id uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.hayvan_takip_muayene_planla(p_takip_id uuid, p_tarih date, p_saat time without time zone) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.hayvan_takip_muayene_planla(p_takip_id uuid, p_tarih date, p_saat time without time zone) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.hayvan_takip_muayene_sonuc(p_gorev_id uuid, p_sonuc text, p_not text, p_sonraki_tarih date, p_sonraki_saat time without time zone) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.hayvan_takip_muayene_sonuc(p_gorev_id uuid, p_sonuc text, p_not text, p_sonraki_tarih date, p_sonraki_saat time without time zone) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.hayvan_takip_muayene_vaka(p_gorev_id uuid, p_case_id uuid, p_not text) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.hayvan_takip_muayene_vaka(p_gorev_id uuid, p_case_id uuid, p_not text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public._trg_hayvan_cikis_takip_kapat() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public._tohumlama_bos_cekirdek(p_tohumlama_id text, p_gerekce text) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public._tohumlama_bos_cekirdek(p_tohumlama_id text, p_gerekce text) TO service_role;
+REVOKE ALL ON FUNCTION public.tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text, p_baslangic_tarihi date) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text, p_baslangic_tarihi date) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.tohumlama_sonuc_bos(p_tohumlama_id text, p_notlar text) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.tohumlama_sonuc_bos(p_tohumlama_id text, p_notlar text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text, p_iptal boolean) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text, p_iptal boolean) TO authenticated, service_role;
+
+-- ── 7. FONKSİYON AÇIKLAMALARI (canlı obj_description) ──
+COMMENT ON FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text, p_iptal boolean) IS 'P3b H6: tamamlama dalinda GEBELIK_KONTROL/TAKIP_MUAYENE gorevleri MUAYENE_SONUC_GEREKLI ile reddedilir (kilitsiz guard — kilit sirasi degismedi); gorev yalniz tohumlama_bos_ve_devam muayene yoluyla kapanir. T5 iptal dali + SUTTEN_KESME/padok dallari aynen.';
