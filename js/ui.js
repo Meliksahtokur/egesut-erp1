@@ -3059,7 +3059,10 @@ async function _pgKapiOnayliTekrar(){
     toast('❌ ' + (e2?.message || e2), true);
   }
 }
-// [Boş ata ve uygula] (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
+// [Boş ata ve uygula] iki kol: (1) şablon kancası (window.__pgKapiBosAta; submitCase ve caseSablonUygula
+// verir) Boş + seçilen planı TEK RPC'de yazar (tedavi_sablon_bos_ata_uygula, §18.8, 20261031200007);
+// başarı toast'u çağıranın sonra()'sındadır. (2) Kanca yoksa aşağıdaki P9 yolu.
+// (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
 // PG modu tek transaction'da Boş ataması + PG uygulaması yapar; eski
 // tohumlama_sonuc_bos + __pgKapiTekrar iki-RPC zinciri KALKTI (yarım durum
 // "Boş kaydedildi, PG uygulanamadı" artık imkânsız — T-11). Kapı = seçicinin
@@ -3067,10 +3070,10 @@ async function _pgKapiOnayliTekrar(){
 // son_pg'sinden (yazmasız; seçicinin "son kullanılan PG" ön dolusuyla AYNI kaynak) —
 // sunucu PG_URUN_GEREKLI/PG_DOZ_GEREKLI'nin UI ikizi: çözümsüzse yazma YAPILMAZ.
 /**
- * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular, dry-run
- * ile son PG ürününü çözer, sonra TEK çağrıyla tohumlamayı Boş yapıp PG'yi uygular.
+ * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular. Şablon kancası varsa
+ * Boş + seçilen planı kancanın tek RPC'siyle yazar (kapı PG uygulamaz); yoksa dry-run ile son PG
+ * ürününü çözer, sonra TEK çağrıyla (tohumlamaBosVeDevam) tohumlamayı Boş yapıp PG'yi uygular.
  * @returns {Promise<void>} İşlem sonunda değer döndürmez; başarıda kapı modalı kapatılır, hata durumunda hata mesajı gösterilir ve buton geri açılır.
- * @rpc tohumlama_sonuc_bos
  */
 async function _pgKapiBosAtaUygula(){
   const btn = document.getElementById('pg-kapi-onayla');
@@ -3088,7 +3091,6 @@ async function _pgKapiBosAtaUygula(){
     }
     window.__pgKapiVazgec = null;
     _pgKapiKapat();
-    toast('✅ Tohumlama Boş atandı, tedavi planı yazıldı');
     await pullTables(['tohumlama', 'hayvanlar']).catch(() => {});
     if (typeof sonra === 'function') await sonra();
     return;
@@ -14148,7 +14150,11 @@ async function caseSablonUygula(sablonId){
     r = await cagri(false, null);
     await sonra();
   } catch(e) {
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'tedavi_sablon_uygula')) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'tedavi_sablon_uygula')) {
+      // §18.8 şablonlu vaka: Boş ata ve uygula = Boş + bu plan tek işlemde (başlangıç günü dahil).
+      window.__pgKapiBosAta = _vakaBosAtaKanca(_curCase.id, sablonId, x => { r = x; }, tarih);
+      return;
+    }
     toast(getUserMessage(e), true);
   }
 }

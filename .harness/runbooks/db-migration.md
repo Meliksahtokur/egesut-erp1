@@ -39,12 +39,15 @@ measurement of live state. Commits: `e3c281e` (apply), `b75d154`
 
 ## Series apply order
 
-Hayvan Takip (`G-20261031-HAYVAN-TAKIP`), six files, one transaction, in order:
+Hayvan Takip (`G-20261031-HAYVAN-TAKIP`), seven files, one transaction, in order:
 `20261031200001_hayvan_takip_sema`, `20261031200002_hayvan_takip_rpc`,
 `20261031200003_gorev_tamamla_hayvan_takip`,
 `20261031200004_hayvan_takip_halsizlik_etiket`,
-`20261031200005_hayvan_takip_muayene_vaka`, `20261031200006_hayvan_takip_kilit`.
-`200006` replaces four bodies from `200002`; never stop at `200005`. Files under
+`20261031200005_hayvan_takip_muayene_vaka`, `20261031200006_hayvan_takip_kilit`,
+`20261031200007_vaka_sablon_pg_kapi`.
+`200006` replaces four bodies from `200002`; never stop at `200005`. `200007` stops itself
+(`TOHUMLAMA_SONUC_BOS_GOVDE_FARKLI`) unless the live `tohumlama_sonuc_bos` body md5 is
+`33144c237d1749ab79f6a0e968e92a01` (20260924000001); then the whole transaction rolls back. Files under
 `tests/db-validation/` are validation fixtures and are never applied.
 
 ## Boundaries

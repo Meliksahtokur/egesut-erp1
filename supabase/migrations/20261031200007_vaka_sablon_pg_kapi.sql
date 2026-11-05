@@ -2,13 +2,17 @@
 -- Tarih: 2026-11-05. Kaynak: sahip kararı (domain-rules §18.8), U2-PG raporu. Önceki migration: 20261031200006.
 -- BEGIN/COMMIT yok: runbook ve test sarmalayıcısı dışarıdan sarar. Prod apply sahip kapısındadır.
 -- Neden: bugünkü kapı yolu (tohumlama_bos_ve_devam PG modu) PG'yi hemen uygular, plan ikinci kez PG yazar (çift PG);
---   tohumlama_sonuc_bos + plan ise ailesiz vakada fazladan OVSYNC_BASLAT açar ve atomik değildir (U2-PG M2/M3).
--- 1) _tohumlama_bos_cekirdek: tohumlama_sonuc_bos'un Boş yazım çekirdeği (20260924000001 gövdesi), açık dişi görevi YOK.
+--   tohumlama_sonuc_bos + plan ise Ovsync şablonunda (plan yazılmadan vaka ailesiz) fazladan OVSYNC_BASLAT açar ve atomik değildir (U2-PG M2/M3).
+-- 1) _tohumlama_bos_cekirdek: tohumlama_sonuc_bos'un Boş yazım çekirdeği (20260924000001 gövdesi), açık dişi görevi
+--    çağıranda (tohumlama_sonuc_bos hemen, yeni RPC plandan sonra).
 -- 2) tohumlama_sonuc_bos: yalnız çekirdeği çağıracak şekilde yeniden yazılır; imza, ACL, dönüşler ve yan etki aynı.
 --    Önkoşul: canlı gövde 20260924000001 ile birebir (md5 aşağıda); değilse migration durur.
 -- 3) tedavi_sablon_bos_ata_uygula: hayvan kilidi (FOR NO KEY UPDATE, 200006 kuralı) → ön koşullar → Boş çekirdeği →
---    tedavi_sablon_uygula (onaysız; kapı Boş sonrası ALLOW verir). Plandaki PG tek PG'dir; kapı PG uygulamaz.
--- ROLLBACK: DROP FUNCTION tedavi_sablon_bos_ata_uygula, tohumlama_sonuc_bos'u 20260924000001 gövdesiyle kur, DROP _tohumlama_bos_cekirdek.
+--    tedavi_sablon_uygula (onaysız; kapı Boş sonrası ALLOW verir) → açık dişi görevi. Plandaki PG tek PG'dir.
+--    Açık dişi görevi plandan SONRA (root kararı 2026-11-05): _acik_disi_hedef_ic aileli (OVSYNC) vakada görev açmaz,
+--    ailesiz şablonda normal Boş yolundaki görevi açar (§18.12 rotası korunur).
+--    p_baslangic_tarihi: vaka detayından uygulamada (caseSablonUygula) planın ilk günü; NULL = vaka başlangıcı.
+-- ROLLBACK: DROP FUNCTION tedavi_sablon_bos_ata_uygula(uuid, uuid, text, text, date), tohumlama_sonuc_bos'u 20260924000001 gövdesiyle kur, DROP _tohumlama_bos_cekirdek.
 
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
@@ -65,7 +69,8 @@ BEGIN
 END;
 $function$;
 
-CREATE FUNCTION public.tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text)
+CREATE FUNCTION public.tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text,
+                                                     p_baslangic_tarihi date DEFAULT NULL)
   RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $function$
 -- §18.8 şablonlu vaka: kapı onayı = Boş + seçilen plan, tek işlem. Ret: PG_KAPI_BOS_ATA:<SEBEP>:<json>.
@@ -86,11 +91,12 @@ BEGIN
     RAISE EXCEPTION 'PG_KAPI_BOS_ATA:TOH_SONUCLU:%', v_d || jsonb_build_object('sonuc', v_son.sonuc); END IF;
   v_islem := public._tohumlama_bos_cekirdek(p_tohumlama_id, btrim(p_gerekce));
   IF v_islem IS NULL THEN RAISE EXCEPTION 'PG_KAPI_BOS_ATA:HAYVAN_AKTIF_DEGIL:%', v_d; END IF;
-  v_r := public.tedavi_sablon_uygula(p_case_id, p_sablon_id, NULL, false, NULL);
+  v_r := public.tedavi_sablon_uygula(p_case_id, p_sablon_id, p_baslangic_tarihi, false, NULL);
   IF NOT COALESCE((v_r->>'ok')::boolean, false) THEN
     RAISE EXCEPTION 'PG_KAPI_BOS_ATA:PLAN_RED:%', v_d || jsonb_build_object('mesaj', v_r->>'mesaj'); END IF;
+  PERFORM public._acik_disi_gorev_kur(v_hayvan);
   RETURN v_r || jsonb_build_object('tohumlama_id', p_tohumlama_id, 'islem_id', v_islem);
 END;
 $function$;
-REVOKE ALL ON FUNCTION public.tedavi_sablon_bos_ata_uygula(uuid, uuid, text, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.tedavi_sablon_bos_ata_uygula(uuid, uuid, text, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.tedavi_sablon_bos_ata_uygula(uuid, uuid, text, text, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.tedavi_sablon_bos_ata_uygula(uuid, uuid, text, text, date) TO authenticated, service_role;

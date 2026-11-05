@@ -938,12 +938,13 @@ async function _vakaSablonOnaySonu(caseId, sablonId, r) {
 
 /**
  * §18.8 şablonlu vaka kapısı (sahip 2026-11-05): "Boş ata ve uygula" tohumlamayı Boş atar ve seçilen planı
- * tek işlemde yazar; dönen plan sonucu `yaz` ile onay sonu kapanışına (_vakaSablonOnaySonu) gider.
+ * tek işlemde yazar; dönen plan sonucu `yaz` ile çağıranın başarı kapanışına (sonra) gider.
+ * Vaka Aç (submitCase) ve vaka detayı (ui.js caseSablonUygula, `baslangic` = planın ilk günü) kullanır.
  * @rpc tedavi_sablon_bos_ata_uygula
  */
-function _vakaBosAtaKanca(caseId, sablonId, yaz) {
+function _vakaBosAtaKanca(caseId, sablonId, yaz, baslangic) {
   return async (tohumlamaId, gerekce) => yaz(await rpc('tedavi_sablon_bos_ata_uygula',
-    { p_case_id: caseId, p_sablon_id: sablonId, p_tohumlama_id: tohumlamaId, p_gerekce: gerekce }));
+    { p_case_id: caseId, p_sablon_id: sablonId, p_tohumlama_id: tohumlamaId, p_gerekce: gerekce, p_baslangic_tarihi: baslangic || null }));
 }
 
 /** PG kapısı onaysız kapandı (_pgKapiKapat): vaka durur, plan yazılmadı. */

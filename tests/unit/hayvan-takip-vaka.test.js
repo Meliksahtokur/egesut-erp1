@@ -603,7 +603,7 @@ const PG_RED_TOH = 'PG_KAPI:REQUIRE_ACK_PENDING:{"tohumlama_id":"T-1"}';
 const BOS_ATA = 'tedavi_sablon_bos_ata_uygula';
 const pgSablonToh = p => { if (!p.p_pg_onay) throw new Error(PG_RED_TOH); throw new Error('onaylı tekrar bu kapıda kullanılmaz'); };
 const bosAtalar = rec => rec.rpc.filter(r => r.ad === BOS_ATA).map(r => r.p);
-const BOS_ATA_P = { p_case_id: 'C-9', p_sablon_id: 'S-1', p_tohumlama_id: 'T-1', p_gerekce: 'gerekçe' };
+const BOS_ATA_P = { p_case_id: 'C-9', p_sablon_id: 'S-1', p_tohumlama_id: 'T-1', p_gerekce: 'gerekçe', p_baslangic_tarihi: null };
 // Boş-ata düğmesi sahte DOM'da elle bağlanır; dokunuş disabled düğmede koşmaz (tarayıcı gibi).
 function bosAtaDugmesi(sandbox) {
   const onay = makeElement('button');
@@ -623,7 +623,7 @@ for (const [ad, takipAcik] of KOLLAR) {
     assert.deepStrictEqual(rec.rpc.map(r => r.ad), [BOS_ATA, EKLE], 'önce Boş + plan, sonra görev; onaylı tekrar yok');
     assert.deepStrictEqual(bosAtalar(rec), [BOS_ATA_P]);
     assert.deepStrictEqual(rec.bosVeDevam, [], 'PG modu ve dry-run çağrılmaz: kapı PG uygulamaz');
-    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'));
+    assert.deepStrictEqual(rec.toast.filter(([m, h]) => !h && m.startsWith('✅')).map(([m]) => m), ['✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'], 'tek ✅');
     assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)'], 'plan-yok uyarısı yok');
     assert.ok(rec.pull.some(t => Array.isArray(t) && t.includes('tohumlama') && t.includes('hayvanlar')), 'tohumlama ve hayvan tazelenir');
     assert.ok(rec.olay.includes('kapat:C-9'), 'Kapat düğmesi tazelenir');

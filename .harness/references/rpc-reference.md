@@ -397,14 +397,16 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 **`tedavi_sablon_uygula(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
 → Açılışta forms.js:568 (2-arg, çapa=start_date); aktif vakada `ui.js:caseSablonUygula` (3-arg; seçilen tarih şablonun 1. günü, mig. 20260909000001). NULL çapa ⇔ eski start_date davranışı.
 
-**`tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text)`** → jsonb
+**`tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
 → `20261031200007`, domain-rules §18.8 şablonlu vaka. Tek işlemde son tohumlamayı Boş atar (islem_log `TOHUMLAMA_SONUC`,
-  snapshot'ta `gerekce`; `OVSYNC_BASLAT` açılmaz) ve `tedavi_sablon_uygula`'yı onaysız çağırır (Boş sonrası kapı ALLOW).
+  snapshot'ta `gerekce`), `tedavi_sablon_uygula`'yı onaysız ve `p_baslangic_tarihi` ile çağırır (Boş sonrası kapı ALLOW),
+  sonra `_acik_disi_gorev_kur` (aileli vakada görev yok, ailesizde normal Boş yolunun görevi).
   Dönüş = plan sonucu + `tohumlama_id`, `islem_id`. Ret (hiçbir şey yazılmaz): `PG_KAPI_BOS_ATA:<SEBEP>:<json>`,
   SEBEP ∈ GEREKCE_GEREKLI, VAKA_YOK (aktif vaka yok), PG_YOK (şablonda PG kalemi yok), TOH_SON_DEGIL (son tohumlama
   değil / başka hayvanın), TOH_SONUCLU (Bekliyor değil; çift çağrı dahil), HAYVAN_AKTIF_DEGIL, PLAN_RED; plan
   istisnaları (ör. KISIR) da her şeyi geri alır. Hayvan kilidi FOR NO KEY UPDATE. ACL: authenticated + service_role.
-  Çağrı: forms.js `_vakaBosAtaKanca` → ui.js `_pgKapiBosAtaUygula` (kapı kancası `window.__pgKapiBosAta`).
+  Çağrı: forms.js `_vakaBosAtaKanca` (submitCase iki kol; ui.js `caseSablonUygula` başlangıç günüyle) → ui.js
+  `_pgKapiBosAtaUygula` (kapı kancası `window.__pgKapiBosAta`).
 
 **`tedavi_sablon_tohumlama_gorev_ekle(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
 → forms.js:569 + `ui.js:caseSablonUygula` (aynı çapa semantiği). **GT'de YOK** (audit).

@@ -84,10 +84,26 @@ SELECT pg_temp.vs_test('VS02', $t$ DECLARE r jsonb; BEGIN
   PERFORM pg_temp.vs_esit((SELECT snapshot->'guncellenen'->0->'onceki'->>'sonuc' FROM public.islem_log WHERE id = r->>'islem_id'), 'Bekliyor', 'geri alma izi');
 END $t$);
 
--- VS03: ailesiz PG şablonu da OVSYNC_BASLAT açmaz (tohumlama_sonuc_bos'tan farkı).
-SELECT pg_temp.vs_test('VS03', $t$ BEGIN
+-- VS03: ailesiz PG şablonu: plandan sonra açık dişi görevi normal Boş yoluyla aynı kurulur (§18.12 rotası; root kararı
+-- 2026-11-05). Kıyas: ikiz hayvanda (H-3) tohumlama_sonuc_bos'un açtığı görevle kaynak deseni, hedef günü ve saati aynı.
+SELECT pg_temp.vs_test('VS03', $t$ DECLARE a text; b text; BEGIN
   PERFORM pg_temp.vs_cagir(2, 2, pg_temp.vs_id('4', 2)::text);
-  PERFORM pg_temp.vs_esit(pg_temp.vs_iz('E2E-VS-H-2'), 'toh=Boş durum=Boş ovsync=0 gebk=0 gun=1 pg_seans=1 pg_olay=0 islem=1', 'iz');
+  PERFORM pg_temp.vs_esit(pg_temp.vs_iz('E2E-VS-H-2'), 'toh=Boş durum=Boş ovsync=1 gebk=0 gun=1 pg_seans=1 pg_olay=0 islem=1', 'iz');
+  PERFORM public.tohumlama_sonuc_bos(pg_temp.vs_id('4', 3)::text);
+  SELECT replace(kaynak, 'E2E-VS-H-2', 'H') || '@' || hedef_tarih || ' ' || hedef_saat INTO a FROM public.gorev_log
+   WHERE hayvan_id = 'E2E-VS-H-2' AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT COALESCE(iptal, false);
+  SELECT replace(kaynak, 'E2E-VS-H-3', 'H') || '@' || hedef_tarih || ' ' || hedef_saat INTO b FROM public.gorev_log
+   WHERE hayvan_id = 'E2E-VS-H-3' AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT COALESCE(iptal, false);
+  PERFORM pg_temp.vs_esit(a, b, 'normal Boş ile aynı görev');
+  PERFORM pg_temp.vs_esit((a LIKE 'ACIK-DISI-H-%')::text, 'true', 'açık dişi kaynağı ' || COALESCE(a, '<yok>'));
+END $t$);
+
+-- VS10: vaka detayından uygulama (caseSablonUygula) başlangıç gününü taşır: plan günü seçilen tarihten başlar.
+SELECT pg_temp.vs_test('VS10', $t$ DECLARE r jsonb; BEGIN
+  r := public.tedavi_sablon_bos_ata_uygula(pg_temp.vs_id('a', 1), pg_temp.vs_id('3', 1), pg_temp.vs_id('4', 1)::text, 'E2E-VS', pg_temp.vs_gun() + 3);
+  PERFORM pg_temp.vs_esit((SELECT min(d.treatment_date)::text FROM public.treatment_days d WHERE d.case_id = pg_temp.vs_id('a', 1)),
+    (pg_temp.vs_gun() + 3)::text, 'ilk plan günü');
+  PERFORM pg_temp.vs_esit(pg_temp.vs_iz('E2E-VS-H-1'), 'toh=Boş durum=Boş ovsync=0 gebk=0 gun=2 pg_seans=1 pg_olay=0 islem=1', 'iz');
 END $t$);
 
 -- VS04: çift çağrı: ikinci çağrı TOH_SONUCLU ile reddedilir, ikinci plan ve ikinci Boş izi yok.
@@ -147,9 +163,9 @@ END $t$);
 
 -- VS09: ACL ve tanım: yeni RPC authenticated'a açık, anon/PUBLIC'e kapalı; iç yardımcı yalnız sahibine; SECURITY DEFINER + search_path.
 SELECT pg_temp.vs_test('VS09', $t$ DECLARE f text; BEGIN
-  PERFORM pg_temp.vs_esit(has_function_privilege('authenticated', 'public.tedavi_sablon_bos_ata_uygula(uuid,uuid,text,text)', 'EXECUTE')::text, 'true', 'authenticated');
-  PERFORM pg_temp.vs_esit(has_function_privilege('anon', 'public.tedavi_sablon_bos_ata_uygula(uuid,uuid,text,text)', 'EXECUTE')::text, 'false', 'anon');
-  FOREACH f IN ARRAY ARRAY['public.tedavi_sablon_bos_ata_uygula(uuid,uuid,text,text)', 'public._tohumlama_bos_cekirdek(text,text)'] LOOP
+  PERFORM pg_temp.vs_esit(has_function_privilege('authenticated', 'public.tedavi_sablon_bos_ata_uygula(uuid,uuid,text,text,date)', 'EXECUTE')::text, 'true', 'authenticated');
+  PERFORM pg_temp.vs_esit(has_function_privilege('anon', 'public.tedavi_sablon_bos_ata_uygula(uuid,uuid,text,text,date)', 'EXECUTE')::text, 'false', 'anon');
+  FOREACH f IN ARRAY ARRAY['public.tedavi_sablon_bos_ata_uygula(uuid,uuid,text,text,date)', 'public._tohumlama_bos_cekirdek(text,text)'] LOOP
     PERFORM pg_temp.vs_esit((SELECT COALESCE(bool_or(a LIKE '=%'), false)::text FROM pg_proc p, unnest(p.proacl::text[]) a WHERE p.oid = f::regprocedure), 'false', f || ' PUBLIC');
     PERFORM pg_temp.vs_esit((SELECT (prosecdef AND 'search_path=public, pg_temp' = ANY(proconfig))::text FROM pg_proc WHERE oid = f::regprocedure), 'true', f || ' definer');
   END LOOP;
