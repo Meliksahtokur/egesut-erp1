@@ -2946,7 +2946,7 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene, sonraOrRpcAd, rpcAd){
     const onaylaDugme = detay.tohumlama_id
       ? `<button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiBosAtaUygula()">Boş ata ve uygula</button>`
       : `<button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiOnayliTekrar()">Onayla ve uygula</button>`;
-    body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b>${kz?` — ${esc(kz)}`:''}${detay.tohumlama_tarihi?` · ${fmtTarih(detay.tohumlama_tarihi)}`:''}${detay.deneme_no?` · deneme ${esc(String(detay.deneme_no))}`:''}.<br><span style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
+    body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b>${kz?` — ${esc(kz)}`:''}${detay.tohumlama_tarihi?` · ${fmtTarih(detay.tohumlama_tarihi)}`:''}${detay.deneme_no?` · deneme ${esc(String(detay.deneme_no))}`:''}.<br><span id="pg-kapi-aciklama" style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
       <label style="font-size:.7rem;font-weight:600;display:block;margin:10px 0 4px">Gerekçe *</label>
       <input id="pg-kapi-gerekce" class="fi" placeholder="Örn: 35. gün kontrolü negatif" oninput="document.getElementById('pg-kapi-onayla').disabled=!this.value.trim()">
       <div style="display:flex;gap:8px;margin-top:14px">
@@ -2976,6 +2976,9 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene, sonraOrRpcAd, rpcAd){
   window.__pgKapiRpcAd = ad || null;
   window.__pgKapiSonra = sonra || null;
   window.__pgKapiBosAta = null; // şablon kancası çağıran tarafından kapı açıldıktan sonra verilir (submitCase)
+  // §18.8: kanca _pgKapiHata dönüşünde eşzamanlı verilir; şablonlu kolda kapı PG uygulamaz → metin mikro görevde düzelir.
+  Promise.resolve().then(() => { const a = document.getElementById('pg-kapi-aciklama');
+    if (a && typeof window.__pgKapiBosAta === 'function') a.textContent = 'PG gebeliği sonlandırabilir. "Boş ata ve uygula": tohumlama Boş atanır ve seçilen tedavi planı yazılır.'; });
 }
 /**
  * PG_KAPI hata mesajını analiz eder, hata kodunu ve detayını ayırarak ilgili fonksiyonu çağırır.
