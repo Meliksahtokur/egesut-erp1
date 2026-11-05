@@ -556,7 +556,7 @@ Kaynak (3-6): sahip 2026-10-17, spec v2 (`docs/2026-10-17-istatistik-atolyesi-sp
    Yeni vaka eski vakadan sonra kaydedilmiş olmalı (`n.created_at > k.created_at`); eski vaka kapanmadan önce aynı gün açılmış yeni vaka da bu sonucu alır (root ruling, Kapı F3).
    24 saatten sonra ve 30 gün içindeki yeni vaka nüks kalır; ölüm/kesim önceliği değişmez.
 
-## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; 200001-6 demoda uygulandı, prod bekliyor)
+## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; 200001-7 demoda uygulandı (200007 §18.8, 2026-11-05), prod bekliyor)
 
 Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve Ovsync "🔍 takipte" rozetinden AYRI bir kavramdır; üreme akışlarını etkilemez. (§19 istatistik modülünündür.)
 
