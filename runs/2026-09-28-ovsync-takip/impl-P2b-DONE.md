@@ -125,7 +125,7 @@ Manifest dışı repo yazımı YOK [OBSERVED `git status --porcelain` — benim 
 
 - `postgrestools check` (3 tur) → 0 hata, 14 bilgi uyarısı
 - `db-validate.sh` (3 koşum) → INCONCLUSIVE → PASS → PASS (final `617c2183`)
-- izole DB `egesut_p2b_prova` (createdb + `db-build-baseline.sh --db-name ... --db-url postgres://postgres:val@127.0.0.1:5433/postgres`) + migration apply + `p2b-birim-prova.sql` → exit=0, 28 senaryo
+- izole DB `egesut_p2b_prova` (createdb + `db-build-baseline.sh --db-name ... --db-url postgres://postgres:<parola>@127.0.0.1:5433/postgres`) + migration apply + `p2b-birim-prova.sql` → exit=0, 28 senaryo
 - demo apply + `p2b-demo-prova.sh` (3 koşum; sonunda temizlik) → dry-run/sentetik/ACL/bayrak kanıtları; sayılar sabit
 - `t72b-mini.py 30 1,2,4` + `30 3` → Ç1/Ç2/Ç3/Ç4 PASS (120 tur × 2 taraf; 40P01/55P03=0)
 - `git diff --check` → temiz; `sha256sum` → `617c2183…`

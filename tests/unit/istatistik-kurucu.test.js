@@ -35,6 +35,7 @@ function sahteBelge() {
         throw new Error('beklenmeyen seçici: ' + sec);
       },
       querySelectorAll(sec) {
+        if (sec === 'button,select,input') return denetimler(e);
         assert.strictEqual(sec, 'canvas[data-kurucu-kart]');
         return [...e._html.matchAll(/<canvas[^>]*data-kurucu-kart="(\d+)"/g)].map(m => {
           const onceki = e.cizimler[Number(m[1])];
@@ -52,6 +53,17 @@ function sahteBelge() {
       },
     };
     return e;
+  }
+  // Panel HTML'indeki denetimler; focus gerçek tarayıcı gibi activeElement'i taşır. Nitelikler kebab→camel dataset'e.
+  function denetimler(e) {
+    return [...e._html.matchAll(/<(button|select|input)\b([^>]*)>(?:([^<]*)<\/button>)?/g)].map(m => {
+      const dataset = {};
+      for (const a of m[2].matchAll(/\sdata-([\w-]+)="([^"]*)"/g)) dataset[a[1].replace(/-(\w)/g, (_, h) => h.toUpperCase())] = a[2];
+      const el = { tagName: m[1].toUpperCase(), dataset, id: (/\sid="([^"]+)"/.exec(m[2]) || [])[1], metin: m[3], panelIci: e,
+        setSelectionRange(a, b) { Object.assign(el, { secim: [a, b], selectionStart: a, selectionEnd: b }); },
+        focus(o) { belge.activeElement = el; belge.odakSecenek = o; } };
+      return el;
+    });
   }
   function icKur(sahip, html) {
     const dusur = ust => { for (const [id, el] of [...idler]) { if (el.sahip === ust) { idler.delete(id); dusur(el); } } };
@@ -1283,4 +1295,55 @@ test('u21_sayi_eki_turkce', () => {
     10: "10'u", 16: "16'sı", 20: "20'si", 30: "30'u", 40: "40'ı", 50: "50'si", 60: "60'ı", 70: "70'i", 80: "80'i", 90: "90'ı",
     100: "100'ü", 200: "200'ü", 110: "110'u", 1000: "1000'i" };
   for (const [n, y] of Object.entries(b)) assert.strictEqual(c._kurucuSayiEk(Number(n)), y);
+});
+
+// ── BORC-UI ──
+test('borc_u2_kart_dipnotu_tek_hesap', () => {
+  const { c } = yukle();
+  const asil = c.grafikDipnotAyir;
+  let sayac = 0;
+  c.grafikDipnotAyir = (...a) => { sayac += 1; return asil(...a); };
+  c.kurucuKartHtml({ ...ilacZarf(), dipnot: [ORTUS, 'Öteki'] }, null, 0);
+  assert.strictEqual(sayac, 1);
+});
+
+// U8: yeniden çizim select dışındaki denetimde de odağı bırakmaz.
+const panelOdak = (belge, bul) => {
+  const panel = belge.getElementById('atolye-cumle-panel');
+  const el = panel.querySelectorAll('button,select,input').find(bul);
+  belge.activeElement = el;
+  return el;
+};
+
+test('borc_u8_cip_odagi_yeniden_cizimde_kalir', async () => {
+  const { c, s, belge } = yukle();
+  s.cumle = xliCumle();
+  await c.kurucuYenile();
+  panelOdak(belge, e => e.dataset.kurucuSlot === 'kirilim' && e.metin === 'Ay');
+  await c.kurucuSlotDegis('kirilim', 'ay');
+  assert.strictEqual(belge.activeElement.metin, 'Ay');
+  assert.strictEqual(belge.activeElement.dataset.kurucuSlot, 'kirilim');
+  assert.strictEqual(belge.odakSecenek.preventScroll, true);
+});
+
+test('borc_u8_baslik_alani_odak_ve_imlec_kalir', async () => {
+  const { c, s, belge } = yukle();
+  s.cumle = xliCumle();
+  await c.kurucuYenile();
+  await c.kurucuKaydet();                                        // başlık alanı açılır
+  const el = panelOdak(belge, e => e.id === 'atolye-kaydet-baslik');
+  Object.assign(el, { selectionStart: 3, selectionEnd: 5 });
+  await c.kurucuYenile();
+  assert.strictEqual(belge.activeElement.id, 'atolye-kaydet-baslik');
+  assert.deepStrictEqual([...belge.activeElement.secim], [3, 5]);
+});
+
+test('borc_u8_denetim_kalkarsa_odak_alinmaz', async () => {
+  const { c, s, belge } = yukle();
+  s.cumle = xliCumle();
+  await c.kurucuYenile();
+  const panel = belge.getElementById('atolye-cumle-panel');
+  belge.activeElement = { tagName: 'BUTTON', dataset: { kurucuEylem: 'olmayan' }, panelIci: panel };
+  await c.kurucuYenile();
+  assert.strictEqual(belge.activeElement.tagName, 'BODY');
 });

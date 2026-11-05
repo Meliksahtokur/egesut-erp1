@@ -49,6 +49,20 @@ function _grafikRenk(i, y, tema) {
 
 function _grafikDolu(v) { return v !== null && v !== undefined; }
 
+// Satır metni. ₺ ölçüsünde fiyatsız vaka n'e girmez: "veri az" fiyatsız ilacı <5 vakalı gibi okuturdu (kısmi geçici fiyat).
+function _grafikAzMetin(zarf, az) {
+  if (!az.length) return '';
+  const satir = g => `${g.ad} ${g.n}`;
+  if (_GRAFIK_TL.indexOf(zarf.olcum) === -1 || !(Number((zarf.sayac || {}).fiyatsiz_n) > 0)) {
+    return `${az.length} ilaçta veri az (<${_GRAFIK_ESIK} vaka): ${az.map(satir).join(' · ')}`;
+  }
+  const birim = zarf.olcum === 'saglik_basari_tl' ? 'fiyatlı başarılı vaka' : 'fiyatlı vaka';
+  const azVar = az.filter(g => g.n > 0);
+  const hic = az.filter(g => !g.n);
+  return [azVar.length ? `${azVar.length} ilaçta ${birim} az (<${_GRAFIK_ESIK}): ${azVar.map(satir).join(' · ')}` : '',
+    hic.length ? `${hic.length} ilaçta ${birim} yok: ${hic.map(g => g.ad).join(' · ')}` : ''].filter(Boolean).join('. ');
+}
+
 /**
  * İlaç kırılımı (x.anahtar hepsi 'ilac:…', SQL stat_atolye_gruplar_k): çizilecek gruplar ve "veri az" gruplar.
  * Yeterli = sunucunun y doldurduğu hücre (n<5 kuralı SQL'de). Sıra: başarı yüksekten düşüğe, süre ve ₺ küçükten büyüğe,
@@ -77,8 +91,7 @@ function grafikGruplariHazirla(zarf) {
       x: Object.assign({}, x, { deger: sec(x.deger || []), anahtar: sec(anahtar) }) }),
     azGruplar,
     rozet: `${sira.length}/${anahtar.length} ilaçta yeterli veri`,
-    azMetin: azGruplar.length
-      ? `${azGruplar.length} ilaçta veri az (<${_GRAFIK_ESIK} vaka): ${azGruplar.map(g => `${g.ad} ${g.n}`).join(' · ')}` : '',
+    azMetin: _grafikAzMetin(zarf, azGruplar),
   };
 }
 
@@ -88,11 +101,13 @@ function grafikRozet(zarf, durum) {
   return r && (durum === 'veri_yok' || durum === 'fiyat_yok') ? '' : r;
 }
 
+/** Bu durumda kartta grafik çizilir mi (kurucu, pano ve dipnot ayrımı aynı tanımı kullanır). */
+function grafikCizilir(durum) { return durum === 'tamam' || durum === 'kontrast_yok'; }
+
 // S4: kartta görünür kalacak dipnotlar; metin sunucudan. Grafik çizilmeyen kartta hepsi Ayrıntı'da kalır.
 function grafikDipnotAyir(zarf, durum) {
   const tum = zarf && Array.isArray(zarf.dipnot) ? zarf.dipnot : [];
-  const cizilir = durum === 'tamam' || durum === 'kontrast_yok';
-  const uyari = cizilir ? tum.filter(d => /örtüş|gözlemsel/i.test(d)) : [];
+  const uyari = grafikCizilir(durum) ? tum.filter(d => /örtüş|gözlemsel/i.test(d)) : [];
   return { uyari: uyari.join(' '), kalan: tum.filter(d => !uyari.includes(d)) };
 }
 
@@ -306,6 +321,19 @@ function _grafikYPay(s) {
   s.width = Math.max(s.width, Math.min(s._getLabelSizes().widest.width + _GRAFIK_Y_BOSLUK, s.chart.width / 2));
 }
 
+// Pay tuvalin yarısında biter: sığmayan ad ortaya en yakın boşluktan iki satıra bölünür, soldan kesilmez. Tooltip tam adı yazar.
+// Yazı tipi Chart.js özel API'si (_getLabelSizes gibi, vendor sabit): options.ticks.font burada çözülmemiş gelir.
+function _grafikYEtiket(v, i) {
+  const ad = String(this.getLabelForValue(v));
+  this.ctx.save();
+  this.ctx.font = this._resolveTickFontOptions(i).string;
+  const sigar = this.ctx.measureText(ad).width + _GRAFIK_Y_BOSLUK <= this.chart.width / 2;
+  this.ctx.restore();
+  if (sigar) return ad;
+  const bosluk = [...ad.matchAll(/ /g)].map(m => m.index).sort((a, b) => Math.abs(a - ad.length / 2) - Math.abs(b - ad.length / 2))[0];
+  return bosluk === undefined ? ad : [ad.slice(0, bosluk), ad.slice(bosluk + 1)];
+}
+
 function _grafikCubuk(zarf, tema, ozet, nMetni) {
   const s = (zarf.seriler || [])[0] || {};
   const y = s.y || [];
@@ -343,7 +371,7 @@ function _grafikCubuk(zarf, tema, ozet, nMetni) {
   const yukseklik = etiket.length * _GRAFIK_SATIR_PX + _GRAFIK_EKSEN_PX;
   return { type: 'bar', data: { labels: etiket, datasets: ds }, plugins: [_GRAFIK_ISARET_EKLENTI, _GRAFIK_METIN_EKLENTI], ozet,
     yukseklik: yukseklik > _GRAFIK_TABAN_PX ? yukseklik : null,
-    options: _grafikSecenek(tema, { indexAxis: 'y', x, layout, y: { afterFit: _grafikYPay, ticks: { color: tema.metin, autoSkip: false } } }) };
+    options: _grafikSecenek(tema, { indexAxis: 'y', x, layout, y: { afterFit: _grafikYPay, ticks: { color: tema.metin, autoSkip: false, callback: _grafikYEtiket } } }) };
 }
 
 function _grafikCizgi(zarf, tema, ozet) {
@@ -453,6 +481,6 @@ function temaRenkleri() {
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Object.assign(module.exports || {}, {
-    grafikGruplariHazirla, grafikRozet, grafikDipnotAyir, zarfDurum, durumMetni, dozMetni, zarfOzetCumle, zarfGrafikConfig, egriGrafikConfig, grafikCiz, temaRenkleri,
+    grafikGruplariHazirla, grafikRozet, grafikCizilir, grafikDipnotAyir, zarfDurum, durumMetni, dozMetni, zarfOzetCumle, zarfGrafikConfig, egriGrafikConfig, grafikCiz, temaRenkleri,
   });
 }

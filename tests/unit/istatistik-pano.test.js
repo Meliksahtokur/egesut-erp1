@@ -51,6 +51,7 @@ class Dugum {
   set disabled(v) { if (v) this.attrs.disabled = true; else delete this.attrs.disabled; }
   addEventListener() {}
   scrollIntoView() {}
+  contains(x) { for (let d = x; d; d = d.parent) if (d === this) return true; return false; }
   // Tarayıcı kuralı: pasif ya da ağaçtan kopmuş öğe odak alamaz (activeElement body'ye düşer).
   get bagli() { let d = this; while (d.parent) { if (!d.parent.children.includes(d)) return false; d = d.parent; } return d.attrs.id === 'atolye-icerik'; }
   focus() { if (!this.disabled && this.bagli) Dugum.odak = this; }
@@ -1401,4 +1402,21 @@ test('odak_gec_gelen_kart_cizimi_dusurmez', async () => {
   assert.strictEqual(odak(c), siraDugme(icerik, 'a', '▼'));
   yan.shift()(VERI());
   await y;
+});
+
+// ── BORC-UI ──
+test('borc_u2_kart_dipnotu_tek_hesap', () => {
+  const { c } = kur();
+  const asil = c.grafikDipnotAyir;
+  let sayac = 0;
+  c.grafikDipnotAyir = (...a) => { sayac += 1; return asil(...a); };
+  c.panoKartHtml(KAYIT('a'), [Z_ILAC({ dipnot: [ORTUS, 'Öteki'] })], null);
+  assert.strictEqual(sayac, 1);
+});
+
+test('borc_u4_sirala_dugmesinde_odak_kalir', async () => {
+  const { c, icerik } = await siraKur();                        // siraKur "Sırala"ya basar
+  assert.strictEqual(odak(c), dugme(icerik, 'Sıralamayı bitir'), 'mod açıldı: odak yeni düğmede');
+  await tikla(c, dugme(icerik, 'Sıralamayı bitir'));
+  assert.strictEqual(odak(c), dugme(icerik, 'Sırala'), 'mod kapandı: odak yeni düğmede');
 });
