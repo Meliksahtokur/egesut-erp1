@@ -1,19 +1,18 @@
 ## Önceden cevaplanmış kararlar
-- Ruling C: _vaka_ovsync_mu log kolu yalnız şablon protokol_ailesi=OVSYNC + iptal=false; :MANUEL sayılmaz; JS _hastalikKabulMu aynı kural
-- Aktif iş artık doğum/küpe + görev-protokol fix: runs/2026-10-30-some-fixes/, goal G-20261030-DOGUM-KUPE-FIX ve G-20261030-PROTOKOL-ETKEN (DONE); ovsync-mu kapalı
-- Ruling: GT audit 83 eski fark t8'i bloke etmez (apply öncesi/sonrası birebir aynı); ayrı GT senkron kalemi
+- Aktif iş: hayvan takip (dal hayvan-takipte). Giriş docs/plans/2026-10-31-hayvan-takip-SPEC.md + PLAN + .superpowers/sdd/2026-10-31-hayvan-takip-PLAN/progress.md; raporlar runs/2026-10-31-hayvan-takip/.
+- Ruling: GT audit 83 eski fark bloke etmez; ayrı GT senkron kalemi.
+- PG kapı (sahip 2026-11-05): şablonlu vakada `Boş ata ve uygula` plan yazımı aşamasında çıkar; onay = tek işlemde plan + Boş (200007 `tedavi_sablon_bos_ata_uygula`), çift PG yok.
+- Saat alanları: yuvarlak 08:00/16:00/20:00 hızlı düğmeler (kadran yok), sahip 2026-11-05 onaylı.
 
 ## Sahibin cümleleri (birebir)
-- Bu işte Muse yok, yalnız Anthropic. Ölü küpesi her yolda serbest, aynı anne dahil. UI'dan yalnız aktif hayvan düzenlenir, çıkmış aktiflerle aynı listede görünmez
-- Sahip onayları verildi: 20261031000001 prod apply ve JS merge+push
+- Bu işte Muse yok, yalnız Anthropic. Sahip: plan+DB+frontend opus high, Muse ve sonnet yok (kota).
+- "tekrar dene ve proda geç" (2026-11-05): prod apply + merge/push onaylı.
 
 ## Açık kalemler
-- v_gorev_log_sync kapalı log son-300 penceresi: JS log kolu false negatif riski (düşük, kapsam dışı)
-- GT tam senkron: ground-truth-audit 83 fark (kapanış koşulu audit PASS)
-- F4 ayrı iş: dismiss toplu iptal+süresiz, _gorev_dinle tarih alt sınırı. Bakiye: F3, buzagi_id NULL backfill, eski hayvan_ekle COUNT+1
+- Merge sonrası ayrı işler: islem_log artımlı çekim 0caf527d3d9b, vaccine_diseases 7317544e9509, gorev_tamamla hayvan FOR UPDATE 4a659cb7dbea, tohumlama_sonuc_bos fazla OVSYNC_BASLAT 0ab65414c1f6, şablon sonrası 10 sn boş vaka detayı 937b43d2872b; GERI_ALINDI düğmesi, tip kilidi, §20.9 önizleme, openCaseById.
 
 ## Nerede kaldım
-- Prod tamam: 20261030000001, 20261030100001, 20261031000001 (t5, t8; yedekler ~/yedek/prod-yedek-2026-10-31-*)
-- MERGED a0b2327; sıradaki aday işler board: .ss/some-fixes-BOARD.md
+- Prod: 20261031200001-200007 uygulandı 2026-11-05 09:03 UTC (S1-prod-report.md; GT 85abaee); demo köprüsü hayvan_takip dahil tazelendi.
+- Sıradaki tek adım: kapanış kapısı review → ss-merge-gate --apply (dal hayvan-takipte → main) → dal kapanışı.
 
 ## Quiz

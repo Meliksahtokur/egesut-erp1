@@ -299,6 +299,9 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 | `TEDAVI_GUNCELLENDI` | Tedavi güncelleme |
 | `GOREV_EKLENDI` / `GOREV_GUNCELLENDI` | Görev yaşam döngüsü |
 | `VAKA_ACILDI` | Vaka açılışı |
+| `HAYVAN_TAKIP_ACILDI` | `hayvan_takip_ac` RPC'si |
+| `HAYVAN_TAKIP_KAPANDI` | Takip kapanışı (elle, muayene, vaka, çıkış); takip başına bir satır |
+| `HAYVAN_TAKIP_MUAYENE` | `hayvan_takip_muayene_sonuc` RPC'si; planlama yazmaz |
 
 `ref_id` alanı migration 016+ sonrası kayıtlarda dolu; eski kayıtlarda `snapshot` içinde aranmalı.
 
@@ -309,7 +312,7 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 - `gorev_tipi` değerleri (CHECK kısıtı **yok** — serbest metin; kodda üretilenler):
   `ILAC`, `ASI_PLANLI` (planlı aşı — stok rezervasyonlu, 20260902000003), `BUZAGI_BAKIM`, `GEBELIK_KONTROL` (eski `TOHUMLAMA_HAZIRLIK`'ın yerini aldı, 20260830000010),
   `ILERI_GEBE`, `ILERI_GEBE_ASI`, `BESLEME`, `SUTTEN_KESME`, `PADOK_DEGISIM`, `TOHUMLAMA_PLANLI`,
-  `TEDAVI_GUN`, `TEDAVI_SEANS`, `VETERINER_KONTROL`, `KIZGINLIK_TAKIP`, `DIGER`
+  `TEDAVI_GUN`, `TEDAVI_SEANS`, `VETERINER_KONTROL`, `KIZGINLIK_TAKIP`, `HAYVAN_TAKIP_MUAYENE` (§20.6), `DIGER`
 - Ana görev (`parent_id = NULL`) + alt görevler (`parent_id` dolu); parent kapanınca çocuklar `trg_gorev_parent_kapandi` ile iptal olur
 - `tamamlandi = false` → bekleyen görev
 - `hedef_tarih` geçmişte kalan ve tamamlanmamış görevler gecikmiş sayılır
@@ -428,13 +431,21 @@ Tarih girişi artık tek kanonik bileşenden geçer (bkz. `D-20260909-CANONICAL-
   (`sk-tarih`), doğum (`b-tarih`), hayvan güncelleme (`a-dt`), aşılama
   (`td-asi-tarih`), çıkış (`cx-tarih`), gebelik kontrolü (`geb-tarih`).
 - **Gelecek meşru:** görev hedef tarihleri (`ta-tarih`, `te-tarih`) ve rapel
-  (`td-rapel-tarih`; parent+14..21 dinamik pencere).
+  (`td-rapel-tarih`; parent+14..21 dinamik pencere); hayvan takip muayenesi
+  (`ht-ac-tarih`, `ht-mu-tarih`, `ht-so-tarih`; `min: bugun`, §20.8).
 - **OWNER ONAYI BEKLEYEN davranış değişikliği:** `cx-tarih` (süründen çıkış) ve
   `sk-tarih` (sütten kesme) eski UI'da gelecek tarihe izin veriyordu; F2 ile
   `max=bugun` kısıtı geldi (RPC'ler kaydı anında zaten uygular — gelecek tarihli
   çıkış/kesim aktif-hayvan mantığıyla çelişir). `bv-tarih` toplu-aşı tek-aşı
   (`v-date`) kuralına hizalandı. Sahip istemezse `TARIH_ALANLARI`'nda tek satır
   geri alma.
+
+### Saat alanı standardı (sahip 2026-10-31: "programdaki tüm saat seçimlerinde onu kullanalım standart olsun")
+
+- **Tek biçim:** Programdaki saat alanları `<input type="time">` + `saatAlaniHtml` (`js/utils/helpers.js`) kullanır; değer `HH:MM`. Sahip "yuvarlak hızlı düğmeler" dedi, kendi kadran bileşeni yazılmaz.
+- **Tek çip seti:** `HIZLI_SAATLER` (08:00, 16:00, 20:00). Alan kendi çip setini yazmaz.
+- **Boşun anlamı değişmez:** Standart yalnız girişi değiştirir, boşu alanın kendi akışı yorumlar: takip alanlarında saatsiz, `ert-saat`'te mevcut saat kalır, `bc-tohum-saat` ve `cdt-saat`'te 08:00, saati zorunlu alanlarda hata. Yarım yazılmış saat gönderilmez.
+- **İstisnalar:** `devam-ertele-saat` (§18.15, §18.17) ön seçimsiz açılır, boş = saatsiz. `pu-saat` çipsizdir: geçmiş bir anı girer, hazır saatler uymaz.
 
 ## 18. Üreme Protokolleri — Ovsync / PG / Kısır / Erteleme (2026-09-26, p5b sürümü)
 
@@ -470,6 +481,14 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
 8. **PG onay kapısı:** sunucu `PG_KAPI:*` RAISE ettiğinde HER UI giriş noktası `_pgKapiHata` zinciriyle
    onay penceresi (`#pg-kapi-bs`: Boş ata ve uygula / Vazgeç) açar; düz "Hata" toast'ı YASAK.
    Yeni bir PG giriş noktası eklenirse aynı sarmal zorunludur.
+   **Şablonlu vaka (sahip 2026-11-05, birebir: "boş ata ve uygula çıkması gerekiyor zaten plan yazıldıktan sonra veya
+   yazılmadan önce yani yazılma aşamasında bu uyarunun döndürülmesi gerekiyor"):** Vaka Aç'ta ya da vaka detayında
+   (Şablon uygula) seçilen şablonun planı kapıya takılırsa aynı pencere çıkar. `Boş ata ve uygula` tohumlamayı Boş atar ve **seçilen planı yazar**, tek işlemde
+   (`tedavi_sablon_bos_ata_uygula`, `20261031200007`). Kapı PG uygulamaz; plandaki PG tek PG'dir, gününde uygulanır.
+   Plandan sonra aynı işlemde açık dişi görevi kurulur (root 2026-11-05): Ovsync aileli vakada açılmaz (§18.12 aktif
+   senkronizasyon muafiyeti), ailesiz PG şablonunda normal Boş yolundaki `OVSYNC_BASLAT` görevi açılır. Ret (`PG_KAPI_BOS_ATA:*`) hiçbir şey yazmaz, pencere açık kalır, tekrar denenir.
+   Vazgeç: plan yazılmaz, vaka kayıtlı kalır ("Vaka kayıtlı, tedavi planı uygulanmadı"). Gebe olabilecek hayvana Boş
+   atamasız PG yolu açılmaz (`Onayla ve uygula` bu kapıda yok). Şablon dışı giriş noktalarının davranışı aynıdır.
 9. **Protokol iptal (`protokol_iptal`):** vaka `IPTAL` ile kapanır, açık gün/seans kapanır, stok iade
    edilir; yeniden başlat görevi istenirse kural günü doğar (kural gelmeden görev satırı yok).
 10. **Erteleme:** ertelenebilir görev tipleri `gorev_ertele_kural` tablosundan okunur — JS'e tip listesi
@@ -536,3 +555,30 @@ Kaynak (3-6): sahip 2026-10-17, spec v2 (`docs/2026-10-17-istatistik-atolyesi-sp
    eski vaka nüks değil `basarisiz_tedavi_degisti` sayılır: başarı paydasında başarısız, nüks sayacında yok, kapanma hızında yok, dipnotta ayrı.
    Yeni vaka eski vakadan sonra kaydedilmiş olmalı (`n.created_at > k.created_at`); eski vaka kapanmadan önce aynı gün açılmış yeni vaka da bu sonucu alır (root ruling, Kapı F3).
    24 saatten sonra ve 30 gün içindeki yeni vaka nüks kalır; ölüm/kesim önceliği değişmez.
+
+## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; 200001-7 demoda uygulandı (200007 §18.8, 2026-11-05), prod bekliyor)
+
+Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve Ovsync "🔍 takipte" rozetinden AYRI bir kavramdır; üreme akışlarını etkilemez. (§19 istatistik modülünündür.)
+
+1. **Birden çok takip:** Bir hayvanda aynı anda birden çok açık takip olabilir. Aynı sebepten iki açık takip olamaz; `DIGER` muaftır ve açıklaması zorunludur.
+2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Halsizlik, Diğer). Halsizlik sahip kararıdır (2026-10-31, "sebeplere halsizlik eklenmeli"); `20261031200004` ile gelir; 200001-6 demoda uygulandı, prod bekliyor. Yeni hazır sebep hem `js/config.js` hem `_hayvan_takip_sebep_etiket` ister: etiketsiz kod görev açıklamasında ham kalır.
+3. **Dashboard:** En üstte band; hayvan başına tek satır, sebepler yan yana, en eski açık takip üstte.
+4. **Kapatma:** Karttan pencereyle tek tek ya da tümü, isteğe bağlı not. Sürüden çıkan hayvanın bütün takipleri kendiliğinden kapanır.
+5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz. Muayene sonucundaki `Vaka` yolu (§20.6, sahip 2026-10-31) bu kuralla çelişmez: elle ve açık tek düğmedir, yalnız muayenesi yapılan takibi kapatır; öteki takipler yine sorulur, işaretsiz gelir.
+6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz, üç sonuç vardır: takip sürsün + sonraki muayene, takip kapansın ya da `Vaka`. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur; `Vaka` sonucunda görev önce tamamlanır.
+   - **`Vaka` sonucu (sahip 2026-10-31, "muayene tedavi planı ile kapanmıyor oraya bağlanamıyor", "zaten aktif vaka varsa takip oraya bağlanabilir"):** Muayene, yeni vaka ya da hayvanın mevcut aktif vakası ile sonuçlanır; görev `tamamlandi`, takip `VAKA` nedeniyle kapanır (`hayvan_takip_muayene_vaka`, `20261031200005`). Aktif vaka listesi hastalıkla sınırlı değildir; seçilirse yeni vaka ya da plan açılmaz. Vaka bu hayvanın aktif vakası değilse `HT_VAKA_UYUMSUZ`.
+   - **Hata:** Vazgeçilirse ya da vaka açılamazsa hiçbir şey yazılmaz, görev ve takip açık kalır. Vaka açılıp bağ kurulamazsa vaka kalır, uyarı `Vaka kayıtlı, takip bağlanamadı`; takip vaka sonrası pencereden kapatılabilir, bu yolda görev iptal olur.
+7. **Muayene sonucu geri alınmaz (sahip 2026-10-31):** Yeni tipte görev geri alma ve Geçmiş geri-al düğmeleri kapalıdır; yanlış kapanışta takip yeniden açılır. Bilinen sınırlar (`GERI_ALINDI` kartı, doğrudan RPC yolu): §20.10.
+8. **Muayene tarihi (sahip 2026-10-31):** Geçmiş tarihe muayene planlanamaz; yalnız bugün ve sonrası.
+9. **Değişiklikler sayfasından geri alma (yalnız demo ölçümü Ö1, 2026-10-31; tutarsız durumlar için sahip kararı: §20.10):** Plan ve uygulama motoru işlem içinde çalıştırılıp geri sarılarak ölçüldü; parolalı `degisim_geri_al` çağrılmadı.
+   - **§20.7 ile ilişki:** §20.7 görev detayındaki ve Geçmiş'teki geri alma düğmelerini kapatır. `islem` ve `satir` geri alma yalnız parolalı değişiklik motorunda (Değişiklikler sayfası) kalır; §20.7 bu yolu kapatmaz.
+   - **`islem` seviyesi tutarlıdır.** Çıkış geri alınırsa hayvan `Aktif` olur; kapanan takipler ve iptal olan muayene görevi geri açılır. `KAPANSIN` sonucu geri alınırsa takip ve görev geri açılır.
+   - **`satir` seviyesi yalnız seçilen satırı döndürür.** `hayvanlar` satırı dönerse hayvan `Aktif` olur, takip kapalı ve görev iptal kalır; takip karttan yeniden açılır. Önizleme bu seviyede eksik kalan satırlar için uyarı vermez.
+   - **Tutarsız bırakan iki `satir` hedefi (sahip kararı §20.10: merge'i tutmaz, önizleme uyarısı ayrı iş; bugün engel yok):** Çıkışın `hayvan_takip` satırı, çıkmış hayvanda açık takip bırakır. `gorev_log` satırı, çıkmış hayvanda ya da kapalı takipte açık görev bırakır; bu görevi sonuç penceresi (`HT_TAKIP_KAPALI`) ve `gorev_tamamla` (`MUAYENE_SONUC_GEREKLI`) reddeder, yalnız `p_iptal=true` kapatır.
+   - **Aynı sebep yeniden açıldıysa:** Önizleme "geri alınabilir" der, uygulama `hayvan_takip_acik_sebep_uq` ile reddedilir; eski kapanış geri alınamaz.
+   - **`Vaka` sonucu ölçülmedi:** Ö1 bu sonuçtan önce yapıldı; `islem` geri almasının vakayı nasıl bıraktığı bilinmiyor.
+10. **Sahip kararları (2026-10-31):**
+   - **`GERI_ALINDI` kartı:** Sebep ve not göstermez, `⟲ Geri alınanı geri al` düğmesi kalır. §20.7 ile bilinen uyumsuzluktur; merge'i tutmaz, ayrı iş.
+   - **Muayene kapanışı:** Geçmiş'te üç satır kalır: Kapandı, Takip Muayenesi, notsuz görev kartı.
+   - **Doğrudan RPC yolu:** `gorev_geri_al` ve `gorev_guncelle` yeni tipi kilitlemez, §20.6-8 bu yolla delinebilir. Şimdilik kabul; tip kilidi ayrı iş.
+   - **§20.9 `satir` hedefleri:** Tutarsız bırakan hedefler merge'i tutmaz; önizleme uyarısı ayrı iş.

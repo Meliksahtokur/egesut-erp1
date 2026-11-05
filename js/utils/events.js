@@ -34,6 +34,7 @@ document.addEventListener('click', e => {
 
 // Input delegation — data-input
 document.addEventListener('input', e => {
+  if (e.target.type === 'time') saatCipEsitle(e.target); // elle yazımda saat çipi değerle eşit
   const el = e.target.closest('[data-input]');
   if (!el || !ACTIONS[el.dataset.input]) return;
   ACTIONS[el.dataset.input](el, e);

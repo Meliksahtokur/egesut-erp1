@@ -1,0 +1,674 @@
+// tests/unit/hayvan-takip-vaka.test.js — Hayvan Takip F5: elle tek hayvanlık vakadan sonra açık takipleri soran pencere.
+// Spec §5.5, §6; domain-rules §20.5. forms.js ve closeM gerçektir; rpc, pull, kart, vaka detayı ve htVakaSonrasi sahtedir.
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const { loadBrowserModule, makeDomStub, makeElement, extractFunctionSource } = require('./support/loadModule.js');
+const { getDisplayKupe, bugun } = require('../../js/utils/helpers.js');
+
+const REPO_ROOT = path.join(__dirname, '..', '..');
+const DIZI = ['openCaseDet başladı', 'openCaseDet bitti', 'htVakaSonrasi'];
+const TAKIP_HATA = 'TAKIP_ACIK:{"muayene_tarihi":"2026-10-20"}';
+
+// openCaseDet modalı await'lerden sonra açar (js/ui.js); sahte de gecikmeli çözülür.
+function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null, sablonId = null, sablonHata = null, pgKapi = false, pullRed = false, openDetRed = false, sablonYanit = null, ekleYanit = null, gercekPg = false, kapatRed = false, drugsRed = false, renderRed = false, bosAtaYanit = null } = {}) {
+  const rec = { olay: [], rpc: [], toast: [], ht: [], takipHata: 0, retry: null, pull: [], bosVeDevam: [] };
+  const document = makeDomStub();
+  const input = (id, val) => { const el = makeElement('input'); el.value = val; document.__setEl(id, el); };
+  const formDoldur = () => { input('d-hid', '12345'); input('d-disease-id', 'DS-1'); };
+  formDoldur();
+  document.__setEl('d-disease-cat', makeElement('div'));
+  let ilkCreate = true;
+
+  const { sandbox } = loadBrowserModule('js/forms.js', {
+    dom: document,
+    extra: {
+      g: id => document.getElementById(id),
+      v: id => { const el = document.getElementById(id); return (el && el.value) || ''; },
+      cl: id => { const el = document.getElementById(id); if (el) el.value = ''; },
+      esc: s => String(s || ''),
+      getState: () => [],
+      setState: () => {},
+      toast: (m, h) => { rec.toast.push([m, !!h]); },
+      getUserMessage: e => 'JENERIK:' + (e?.message || String(e)),
+      rpc: async (ad, p) => {
+        rec.rpc.push({ ad, p: JSON.parse(JSON.stringify(p)) });
+        rec.olay.push('rpc:' + ad);
+        if (ad === 'create_case') {
+          if (ilkCreate && takipAcik) { ilkCreate = false; throw new Error(TAKIP_HATA); }
+          if (createHata) throw new Error(createHata);
+        }
+        if (ad === 'hayvan_takip_muayene_vaka' && bagHata) throw new Error(bagHata);
+        if (ad === 'tedavi_sablon_uygula' && sablonHata) throw new Error(sablonHata);
+        if (ad === 'tedavi_sablon_uygula' && sablonYanit) return sablonYanit(p);
+        if (ad === 'tedavi_sablon_tohumlama_gorev_ekle' && ekleYanit) return ekleYanit(p);
+        if (ad === 'tedavi_sablon_bos_ata_uygula' && bosAtaYanit) return bosAtaYanit(p);
+        return { ok: true, case_id: caseId };
+      },
+      pullTables: async t => { rec.pull.push(t); rec.olay.push('pull'); if (pullRed) { rec.olay.push('pull reddetti'); throw new Error('pull'); } return { ok: true, failed: [] }; },
+      history: { state: null, back() {}, pushState() {} },
+      fmtTarih: x => String(x),
+      RPC_TABLES: { tedavi_sablon_uygula: ['cases', 'gorev_log'] },
+      openDet: async () => { rec.olay.push('openDet'); if (openDetRed) throw new Error('kart'); },
+      _pgKapiHata: pgKapi ? (e, cagri) => { rec.pgKapi = cagri; return /^PG_KAPI:/.test(e.message); } : undefined,
+      openCaseDet: async id => {
+        rec.olay.push('openCaseDet başladı');
+        rec.acilanVaka = id;
+        await new Promise(r => setTimeout(r, 5));
+        if (openCaseRed) { rec.olay.push('openCaseDet reddetti'); throw new Error('detay açılamadı'); }
+        rec.olay.push('openCaseDet bitti');
+      },
+      htVakaSonrasi: async (hayvanId, vakaId) => {
+        rec.olay.push('htVakaSonrasi');
+        rec.ht.push([hayvanId, vakaId]);
+        if (htRed) throw new Error('idb okunamadı');
+      },
+      _htTazele: async () => { rec.olay.push('tazele'); },
+      _takipAcikHata: (e, retry) => {
+        if (!/^TAKIP_ACIK:/.test(e?.message || '')) return false;
+        rec.takipHata++;
+        rec.olay.push('_takipAcikHata');
+        rec.retry = retry;
+        return true;
+      },
+      _detAcik: () => false,
+      tohumlamaBosVeDevam: async p => { rec.bosVeDevam.push(p); return { ok: true, son_pg: null }; },
+      hayvanByKupeRef: hid => (hid === '12345' ? { id: 'H-1', kupe_no: '12345' } : null),
+      loadDrugsCache: async () => { rec.olay.push(sandbox._drugsCache.length ? 'drugs bayat' : 'drugs'); if (drugsRed) throw new Error('ilac'); },
+      renderCaseTimeline: async id => { rec.olay.push('render:' + id); if (renderRed) throw new Error('cizim'); },
+      _updateKapatBtn: async id => { rec.olay.push('kapat:' + id); if (kapatRed) throw new Error('idb'); },
+      getDisplayKupe,
+      bugun,
+      idbGetAll: async () => [],
+      db: {},
+    },
+  });
+  sandbox.navigator.onLine = true;
+  sandbox._drugsCache = [];
+  sandbox._kizginlikTedaviId = kizginlikId;
+  sandbox._htMuayeneVaka = muayene;
+  sandbox._seciliSablonId = sablonId;
+  vm.runInContext(extractFunctionSource('js/utils/modal.js', 'closeM'), sandbox);
+  vm.runInContext(extractFunctionSource('js/hayvan-takip-pencere.js', 'htMuayeneVakaBagla'), sandbox);
+  // Gerçek PG kapısı: onay, vazgeç ve tekrar ui.js'in kendi akışından geçer.
+  if (gercekPg) {
+    for (const f of ['_pgKapiAc', '_pgKapiHata', '_pgKapiKapat', '_pgKapiOnayliTekrar', '_pgKapiBosAtaUygula']) vm.runInContext(extractFunctionSource('js/ui.js', f), sandbox);
+    input('pg-kapi-gerekce', 'gerekçe');
+  }
+  return { sandbox, rec, formDoldur };
+}
+
+const hataToastlari = rec => rec.toast.filter(([, hata]) => hata).map(([m]) => m);
+const sonuc = (rec, ...adlar) => rec.olay.filter(o => adlar.includes(o));
+const createSayisi = rec => rec.rpc.filter(r => r.ad === 'create_case').length;
+
+test('HT-V-01: başarı kolu openCaseDet bitmeden pencere açılmaz, bir kez sorulur', async () => {
+  const { sandbox, rec } = sahne();
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  assert.strictEqual(rec.acilanVaka, 'C-9');
+  assert.deepStrictEqual(hataToastlari(rec), []);
+});
+
+test('HT-V-02: caseTakipRetry kolu aynı sırada, kendi vakasıyla sorar', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true, caseId: 'C-R' });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), [], 'onaydan önce vaka detayı ve pencere yok');
+  const donen = await rec.retry(false);
+  assert.strictEqual(donen.case_id, 'C-R', 'retry res2 döndürmeye devam eder');
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-R']]);
+  assert.strictEqual(rec.acilanVaka, 'C-R');
+});
+
+test('HT-V-03: htVakaSonrasi reddederse vaka toast\'u korunur, tek uyarı çıkar, istisna dışarı çıkmaz', async () => {
+  const { sandbox, rec } = sahne({ htRed: true });
+  await assert.doesNotReject(sandbox.submitCase(null));
+  assert.ok(rec.toast.some(([m, h]) => m === '✅ Vaka açıldı' && !h), 'vaka toast\'u');
+  assert.deepStrictEqual(hataToastlari(rec), ['⚠️ Vaka kayıtlı, takip penceresi açılamadı']);
+  assert.strictEqual(rec.takipHata, 0);
+  assert.strictEqual(createSayisi(rec), 1);
+});
+
+test('HT-V-03b: caseTakipRetry kolunda da pencere hatası retry\'ı reddettirmez', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true, htRed: true });
+  await sandbox.submitCase(null);
+  const donen = await rec.retry(false);
+  assert.strictEqual(donen.case_id, 'C-9');
+  assert.deepStrictEqual(hataToastlari(rec), ['⚠️ Vaka kayıtlı, takip penceresi açılamadı']);
+  assert.strictEqual(createSayisi(rec), 2);
+});
+
+test('HT-V-06: başarı kolunda openCaseDet reddederse hata toast\'u yok, pencere yine bir kez', async () => {
+  const { sandbox, rec } = sahne({ openCaseRed: true });
+  await assert.doesNotReject(sandbox.submitCase(null));
+  assert.deepStrictEqual(hataToastlari(rec), []);
+  assert.strictEqual(rec.takipHata, 0, '_takipAcikHata çağrılmaz');
+  assert.strictEqual(createSayisi(rec), 1, 'create_case yeniden çağrılmaz');
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  assert.deepStrictEqual(sonuc(rec, 'openCaseDet reddetti', 'htVakaSonrasi'), ['openCaseDet reddetti', 'htVakaSonrasi']);
+});
+
+test('HT-V-06b: caseTakipRetry kolunda openCaseDet reddederse retry çözülür, ikinci vaka açılmaz, pencere bir kez', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true, openCaseRed: true });
+  await sandbox.submitCase(null);
+  const donen = await rec.retry(false);
+  assert.strictEqual(donen.case_id, 'C-9');
+  assert.deepStrictEqual(hataToastlari(rec), []);
+  assert.strictEqual(rec.takipHata, 1, 'yalnız ilk TAKIP_ACIK için');
+  assert.strictEqual(createSayisi(rec), 2, 'ilk red + tek onaylı çağrı');
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+});
+
+test('HT-V-04: TAKIP_ACIK onayı vaka öncesinde kalır; retry onaydan sonra çalışır', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.olay, ['rpc:create_case', '_takipAcikHata'], 'onay öncesi başka adım yok');
+  assert.strictEqual(rec.rpc[0].p.p_takip_onay, undefined, 'ilk çağrı onaysız');
+  assert.deepStrictEqual(rec.ht, []);
+  await rec.retry(false);
+  assert.strictEqual(rec.rpc[1].p.p_takip_onay, true, 'ikinci çağrı onaylı');
+  const sira = rec.olay.indexOf('_takipAcikHata');
+  assert.ok(sira < rec.olay.lastIndexOf('rpc:create_case'), 'onaylı create_case onaydan sonra');
+  assert.ok(rec.olay.lastIndexOf('rpc:create_case') < rec.olay.indexOf('openDet'), 'kart vakadan sonra');
+  assert.ok(rec.olay.indexOf('openDet') < rec.olay.indexOf('openCaseDet başladı'), 'detay karttan sonra');
+});
+
+test('HT-V-05: toplu, kızgınlık ve otomatik yollar pencere açmaz; tek giriş submitCase', () => {
+  const toplu = extractFunctionSource('js/forms.js', 'submitBulkCase');
+  const gonderIdx = toplu.indexOf('const gonder = async');
+  assert.ok(gonderIdx > 0, 'gonder gövdesi submitBulkCase içinde bulunmalı');
+  const govdeler = {
+    submitBulkCase: toplu,
+    gonder: toplu.slice(gonderIdx),
+    sorunVakaAc: extractFunctionSource('js/ui.js', 'sorunVakaAc'),
+    submitKizginlik: extractFunctionSource('js/forms.js', 'submitKizginlik'),
+    kizginlikTedaviAc: extractFunctionSource('js/ui.js', 'kizginlikTedaviAc'),
+  };
+  assert.ok(govdeler.gonder.includes("rpc('vaka_toplu_ac'"), 'tarama doğru gövdede');
+  assert.ok(govdeler.sorunVakaAc.includes("rpc('kizginlik_vaka_ac'"), 'tarama doğru gövdede');
+  for (const [ad, g] of Object.entries(govdeler)) {
+    assert.ok(!/htVakaSonrasi|_vakaSonrasiAkis|htKapatPencere/.test(g), ad + ' pencere açmamalı');
+  }
+  // Otomatik yol: js/ altında htVakaSonrasi'nin tek çağıranı sarmal, sarmalın tek çağıranı submitCase.
+  const js = path.join(REPO_ROOT, 'js');
+  const dosyalar = fs.readdirSync(js, { recursive: true }).filter(f => f.endsWith('.js') && !f.startsWith('_archive'));
+  const say = re => dosyalar.reduce((t, f) => t + (fs.readFileSync(path.join(js, f), 'utf8').match(re) || []).length, 0);
+  assert.strictEqual(say(/\bhtVakaSonrasi\(/g), 2, 'tanım + _htVakaSonrasiGuvenli');
+  assert.strictEqual(say(/\b_vakaSonrasiAkis\(/g), 3, 'tanım + submitCase iki kolu');
+  assert.strictEqual((extractFunctionSource('js/forms.js', 'submitCase').match(/_vakaSonrasiAkis\(/g) || []).length, 2);
+});
+
+test('HT-V-07: vaka açılmadıysa pencere yok', async () => {
+  const red = sahne({ createHata: 'BASKA_HATA' });
+  await red.sandbox.submitCase(null);
+  assert.deepStrictEqual(hataToastlari(red.rec), ['JENERIK:BASKA_HATA']);
+  assert.deepStrictEqual(red.rec.ht, []);
+
+  const kimliksiz = sahne({ caseId: null });
+  await kimliksiz.sandbox.submitCase(null);
+  assert.deepStrictEqual(kimliksiz.rec.ht, []);
+  assert.deepStrictEqual(sonuc(kimliksiz.rec, ...DIZI), []);
+});
+
+test('HT-V-06c: caseTakipRetry kolunda detay ve pencere birlikte reddederse retry yine çözülür, ikinci vaka açılmaz', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true, openCaseRed: true, htRed: true });
+  await sandbox.submitCase(null);
+  await assert.doesNotReject(rec.retry(false));
+  assert.strictEqual(createSayisi(rec), 2);
+});
+
+const baglantilar = rec => rec.rpc.filter(r => r.ad === 'kizginlik_tedavi_baglanti_kur').map(r => r.p);
+
+test('HT-V-08: kızgınlık Tedavi yolu pencere açmaz; bağlantı, kapanıştan sonra da kurulur; sonraki elle vaka sorar', async () => {
+  const { sandbox, rec, formDoldur } = sahne({ kizginlikId: 'K-1' });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, []);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI.slice(0, 2));
+  assert.deepStrictEqual(baglantilar(rec), [{ p_kayit_id: 'K-1', p_case_id: 'C-9' }]);
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
+  assert.deepStrictEqual(hataToastlari(rec), []);
+
+  formDoldur();
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']], 'sonraki elle vaka sorar');
+  assert.strictEqual(baglantilar(rec).length, 1, 'elle vaka eski kayda bağlanmaz');
+});
+
+test('HT-V-08b: onaylı kızgınlık vakası pencere açmaz, bağlantı kurmaz (mevcut); sonraki elle vaka sorar', async () => {
+  const { sandbox, rec, formDoldur } = sahne({ takipAcik: true, kizginlikId: 'K-1' });
+  await sandbox.submitCase(null);
+  assert.strictEqual(sandbox._kizginlikTedaviId, 'K-1', 'onay beklerken form açık, işaret durur');
+  await rec.retry(false);
+  assert.deepStrictEqual(rec.ht, []);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI.slice(0, 2));
+  assert.deepStrictEqual(baglantilar(rec), []);
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
+
+  formDoldur();
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  assert.deepStrictEqual(baglantilar(rec), []);
+});
+
+test('HT-V-08c: Tedavi formu X/backdrop ile kapanınca işaret silinir, elle yeni vaka sorar ve bağlanmaz', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1' });
+  sandbox.closeM('m-disease');
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  assert.deepStrictEqual(baglantilar(rec), []);
+});
+
+test('HT-V-08d: başka pencere kapanması ve başarısız kayıt işareti silmez; düzeltilen kayıt kızgınlık sayılır', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', createHata: 'BASKA_HATA' });
+  sandbox.closeM('m-insem-degil');
+  assert.strictEqual(sandbox._kizginlikTedaviId, 'K-1');
+  await sandbox.submitCase(null);
+  assert.strictEqual(sandbox._kizginlikTedaviId, 'K-1', 'form açık, işaret durur');
+
+  const ikinci = sahne({ kizginlikId: 'K-1' });
+  await ikinci.sandbox.submitCase(null);
+  assert.deepStrictEqual(ikinci.rec.ht, []);
+  assert.deepStrictEqual(rec.ht, []);
+});
+
+// ── Muayeneden vakaya bağ (Yol A) ────────────────────────────
+const MUAYENE = { gorevId: 'g1', hayvanId: 'H-1', not: 'şişlik' };
+const BAG = 'rpc:hayvan_takip_muayene_vaka';
+const BAG_DIZI = ['openCaseDet başladı', 'openCaseDet bitti', BAG, 'htVakaSonrasi'];
+const baglar = rec => rec.rpc.filter(r => r.ad === 'hayvan_takip_muayene_vaka').map(r => r.p);
+
+test('HT-V-10: bağlam yalnız m-disease kapanışıyla düşer', () => {
+  const { sandbox } = sahne({ muayene: MUAYENE });
+  sandbox.closeM('m-ht-sonuc');
+  sandbox.closeM('m-insem-degil');
+  assert.strictEqual(sandbox._htMuayeneVaka, MUAYENE);
+  sandbox.closeM('m-disease');
+  assert.strictEqual(sandbox._htMuayeneVaka, null);
+});
+
+test('HT-V-10b: closeM m-disease temizliği tek blok; ikisi de birlikte düşer', () => {
+  assert.strictEqual((extractFunctionSource('js/utils/modal.js', 'closeM').match(/if \(id === 'm-disease'\)/g) || []).length, 1);
+  const { sandbox } = sahne({ muayene: MUAYENE, kizginlikId: 'K-1' });
+  sandbox.closeM('m-disease');
+  assert.strictEqual(sandbox._kizginlikTedaviId, null);
+  assert.strictEqual(sandbox._htMuayeneVaka, null);
+});
+
+test('HT-V-11: form başka hayvana çevrildiyse vaka açılmaz, bağlam ve düğme kalır', async () => {
+  const { sandbox, rec } = sahne({ muayene: { ...MUAYENE, hayvanId: 'H-BASKA' } });
+  const btn = makeElement('button');
+  await sandbox.submitCase(btn);
+  assert.strictEqual(createSayisi(rec), 0);
+  assert.deepStrictEqual(baglar(rec), []);
+  assert.deepStrictEqual(hataToastlari(rec), ['⚠️ Bu vaka muayene edilen hayvana açılmalı']);
+  assert.ok(sandbox._htMuayeneVaka, 'form açık, bağlam durur');
+  assert.notStrictEqual(btn.disabled, true);
+});
+
+test('HT-V-12: başarı kolunda bağ detaydan sonra, sorudan önce; bağlam kapanışta düşer, sonraki elle vaka bağlanmaz', async () => {
+  const { sandbox, rec, formDoldur } = sahne({ muayene: MUAYENE });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(sonuc(rec, ...BAG_DIZI), BAG_DIZI);
+  assert.deepStrictEqual(baglar(rec), [{ p_gorev_id: 'g1', p_case_id: 'C-9', p_not: 'şişlik' }]);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  assert.strictEqual(sandbox._htMuayeneVaka, null);
+  assert.deepStrictEqual(hataToastlari(rec), []);
+  formDoldur();
+  await sandbox.submitCase(null);
+  assert.strictEqual(baglar(rec).length, 1, 'ikinci vaka bağlanmaz');
+});
+
+test('HT-V-13: caseTakipRetry kolu aynı noktadan bağlar; onaydan önce bağ yok, kapanış bağlamı düşürse de korunur', async () => {
+  const { sandbox, rec } = sahne({ muayene: MUAYENE, takipAcik: true, caseId: 'C-R' });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(baglar(rec), []);
+  assert.ok(sandbox._htMuayeneVaka, 'onay beklerken form açık');
+  const donen = await rec.retry(false);
+  assert.strictEqual(donen.case_id, 'C-R');
+  assert.deepStrictEqual(sonuc(rec, ...BAG_DIZI), BAG_DIZI);
+  assert.deepStrictEqual(baglar(rec), [{ p_gorev_id: 'g1', p_case_id: 'C-R', p_not: 'şişlik' }]);
+  assert.strictEqual(sandbox._htMuayeneVaka, null);
+});
+
+for (const takipAcik of [false, true]) {
+  test(`HT-V-14 (${takipAcik ? 'retry' : 'başarı'}): bağ hatası toast verir, akış sürer: soru yine sorulur, vaka ikinci kez açılmaz`, async () => {
+    const { sandbox, rec } = sahne({ muayene: MUAYENE, takipAcik, bagHata: 'HT_VAKA_UYUMSUZ' });
+    await assert.doesNotReject(sandbox.submitCase(null));
+    if (takipAcik) await assert.doesNotReject(rec.retry(false));
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ Vaka kayıtlı, takip bağlanamadı']);
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    assert.strictEqual(createSayisi(rec), takipAcik ? 2 : 1);
+    assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+  });
+}
+
+test('HT-V-15: bayat kapalı görevde bağ hata göstermez, tazeler, akış sürer', async () => {
+  const { sandbox, rec } = sahne({ muayene: MUAYENE, bagHata: 'HT_GOREV_KAPALI' });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(hataToastlari(rec), []);
+  assert.deepStrictEqual(sonuc(rec, BAG, 'tazele', 'htVakaSonrasi'), [BAG, 'tazele', 'htVakaSonrasi']);
+});
+
+test('HT-V-16: kızgınlık kolu bağlam taşımaz: işaret varken eski bağlam bağlanmaz, pencere de açılmaz', async () => {
+  const { sandbox, rec } = sahne({ muayene: MUAYENE, kizginlikId: 'K-1' });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(baglar(rec), []);
+  assert.deepStrictEqual(rec.ht, []);
+  assert.strictEqual(baglantilar(rec).length, 1);
+});
+
+test('HT-V-17: vaka hatasında hiçbir şey yazılmaz, görev açık kalır, bağlam durur; vazgeçince düşer', async () => {
+  const { sandbox, rec } = sahne({ muayene: MUAYENE, createHata: 'Zaten aktif' });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(baglar(rec), []);
+  assert.deepStrictEqual(rec.ht, []);
+  assert.ok(sandbox._htMuayeneVaka);
+  sandbox.closeM('m-disease');
+  assert.strictEqual(sandbox._htMuayeneVaka, null);
+});
+
+test('HT-V-18: elle vakada bağlam yok, bağ RPC\'si çağrılmaz (mevcut akış aynı)', async () => {
+  const { sandbox, rec } = sahne();
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(baglar(rec), []);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI);
+  assert.deepStrictEqual(rec.toast, [['✅ Vaka açıldı', false]]);
+});
+
+test('HT-V-19: detay hatası bağı kesmez: vaka kayıtlı, bağ kurulur', async () => {
+  const det = sahne({ muayene: MUAYENE, openCaseRed: true });
+  await det.sandbox.submitCase(null);
+  assert.deepStrictEqual(sonuc(det.rec, 'openCaseDet reddetti', BAG, 'htVakaSonrasi'), ['openCaseDet reddetti', BAG, 'htVakaSonrasi']);
+});
+
+test('HT-V-20: vaka kimliği yoksa bağ yok', async () => {
+  const { sandbox, rec } = sahne({ muayene: MUAYENE, caseId: null });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(baglar(rec), []);
+});
+
+// ── Vaka kayıtlıyken ara hatalar (U2 kapı turu) ──────────────
+const KOLLAR = [['başarı', false], ['retry', true]];
+const kos = async (o, takipAcik) => {
+  const k = sahne({ muayene: MUAYENE, takipAcik, ...o });
+  await assert.doesNotReject(k.sandbox.submitCase(null));
+  if (takipAcik) await assert.doesNotReject(k.rec.retry(false));
+  return k;
+};
+
+for (const [ad, takipAcik] of KOLLAR) {
+  test(`HT-V-21 (${ad}): şablon reddi kayıtlı vakayı bozmaz: uyarı çıkar, form kapanır, bağ ve soru koşar, ikinci basış ikinci vaka açmaz`, async () => {
+    const { sandbox, rec } = await kos({ sablonId: 'S-1', sablonHata: 'stok yok', pgKapi: true }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec), ['Vaka açıldı ama şablon uygulanamadı: stok yok']);
+    assert.deepStrictEqual(sonuc(rec, ...BAG_DIZI), BAG_DIZI);
+    assert.strictEqual(sandbox._seciliSablonId, null);
+    assert.strictEqual(sandbox._htMuayeneVaka, null, 'form kapandı');
+    const sayi = createSayisi(rec);
+    await sandbox.submitCase(null);
+    assert.strictEqual(createSayisi(rec), sayi, 'ikinci vaka yok');
+  });
+
+  test(`HT-V-22 (${ad}): PG kapısı reddi kapı ekranına gider; onaylı tekrar aynı vaka ve şablonla gider, bağ ve soru koşar`, async () => {
+    const { rec } = await kos({ sablonId: 'S-1', sablonHata: 'PG_KAPI:REQUIRE_ACK_PENDING:{}', pgKapi: true }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec), []);
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    rec.rpc.length = 0;
+    await rec.pgKapi(true, 'gerekçe').catch(() => {});
+    assert.deepStrictEqual(rec.rpc, [{ ad: 'tedavi_sablon_uygula', p: { p_case_id: 'C-9', p_sablon_id: 'S-1', p_pg_onay: true, p_pg_gerekce: 'gerekçe' } }]);
+  });
+
+  test(`HT-V-23 (${ad}): kart ya da tazeleme reddi bağı ve soruyu kesmez, ikinci vaka açılmaz`, async () => {
+    for (const o of [{ pullRed: true }, { openDetRed: true }, { pullRed: true, openDetRed: true }]) {
+      const { rec } = await kos(o, takipAcik);
+      assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi'], JSON.stringify(o));
+      assert.deepStrictEqual(hataToastlari(rec), [], JSON.stringify(o));
+      assert.strictEqual(createSayisi(rec), takipAcik ? 2 : 1);
+    }
+  });
+
+  test(`HT-V-24 (${ad}): tazeleme reddinden sonra bağ da düşerse §20.6 uyarısı çıkar`, async () => {
+    const { rec } = await kos({ pullRed: true, openDetRed: true, bagHata: 'BAGLANTI' }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ Vaka kayıtlı, takip bağlanamadı']);
+  });
+}
+
+test('HT-V-25: tazeleme reddi kızgınlık bağlantısını da kesmez', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', pullRed: true });
+  await sandbox.submitCase(null);
+  assert.strictEqual(baglantilar(rec).length, 1);
+  assert.deepStrictEqual(hataToastlari(rec), []);
+});
+
+// ── Madde 8: PG kapısı onayı ve vazgeçişi ────────────────────
+const PG_RED = 'PG_KAPI:REQUIRE_ACK_PENDING:{}';
+const UYGUN = { ok: true, gun_sayisi: 3, atlanan: ['x'] };
+const pgSablon = p => { if (!p.p_pg_onay) throw new Error(PG_RED); return UYGUN; };
+const EKLE = 'tedavi_sablon_tohumlama_gorev_ekle';
+const ekleler = rec => rec.rpc.filter(r => r.ad === EKLE).map(r => r.p);
+const PLAN_YOK = '⚠️ Vaka kayıtlı, tedavi planı uygulanmadı';
+const GOREV_YOK = '⚠️ Plan uygulandı, planlı tohumlama görevi açılamadı';
+const kapi = (o, takipAcik) => kos({ sablonId: 'S-1', gercekPg: true, ...o }, takipAcik);
+const TAZELE = ['pull', 'drugs', 'drugs bayat', 'render:C-9', 'kapat:C-9', 'render:C-X', 'kapat:C-X'];
+// Sahte DOM innerHTML çözmez: kapı düğmeleri elle bağlanır. Dokunuş tarayıcıdaki gibidir: disabled düğme onclick koşturmaz.
+function kapiDugmeleri(sandbox) {
+  const box = sandbox.document.body.children.find(e => e.id === 'pg-kapi-bs');
+  const [onay, vazgec, gerekce] = [makeElement('button'), makeElement('button'), makeElement('input')];
+  box.querySelectorAll = () => [onay, vazgec, gerekce];
+  sandbox.document.__setEl('pg-kapi-bs', box);
+  return { onay, vazgec, gerekce, dokun: () => (onay.disabled ? null : sandbox._pgKapiOnayliTekrar()) };
+}
+
+for (const [ad, takipAcik] of KOLLAR) {
+  test(`HT-V-26 (${ad}): PG onayı başarılıysa görev bir kez eklenir, uyarılar normal yoldaki gibi çıkar, tazelenir`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true, olustu: false, sebep: 'gebe' }) }, takipAcik);
+    assert.deepStrictEqual(ekleler(rec), [], 'onaydan önce görev yok');
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi'], 'bağ ve soru kapıyı beklemez');
+    rec.olay.length = 0;
+    rec.toast.length = 0;
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(ekleler(rec), [{ p_case_id: 'C-9', p_sablon_id: 'S-1' }]);
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)', 'ℹ️ Planlı tohumlama görevi açılmadı: gebe']);
+    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün)'));
+    assert.ok(rec.olay.includes('pull'), 'plan ekrana gelir');
+    const once = rec.rpc.findIndex(r => r.ad === 'tedavi_sablon_uygula' && r.p.p_pg_onay);
+    assert.ok(once >= 0 && once < rec.rpc.findIndex(r => r.ad === EKLE), 'önce plan');
+  });
+
+  test(`HT-V-27 (${ad}): kapıdan vazgeçilirse görev eklenmez, plan uyarısı bir kez çıkar, bağ ve soru sürer`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon }, takipAcik);
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    assert.deepStrictEqual(hataToastlari(rec), [], 'kapı açıkken karar verilmedi');
+    sandbox._pgKapiKapat();
+    sandbox._pgKapiKapat();
+    assert.deepStrictEqual(ekleler(rec), []);
+    assert.deepStrictEqual(hataToastlari(rec), [PLAN_YOK]);
+  });
+
+  test(`HT-V-28 (${ad}): onaylı tekrar ok:false dönerse görev eklenmez, plan uyarısı çıkar`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); return { ok: false, mesaj: 'olmadı' }; } }, takipAcik);
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(ekleler(rec), []);
+    assert.deepStrictEqual(hataToastlari(rec).sort(), [PLAN_YOK, '❌ olmadı'].sort());
+  });
+
+  test(`HT-V-29 (${ad}): onaylı tekrar hatası kapıyı açık bırakır; görev yok, vazgeçince plan uyarısı; ikinci onay başarılıysa uyarı yok`, async () => {
+    let n = 0;
+    const k = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); if (!n++) throw new Error('ag'); return UYGUN; } }, takipAcik);
+    await k.sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(ekleler(k.rec), []);
+    assert.ok(!hataToastlari(k.rec).includes(PLAN_YOK), 'karar verilmedi');
+    await k.sandbox._pgKapiOnayliTekrar();
+    assert.strictEqual(ekleler(k.rec).length, 1);
+    assert.ok(!hataToastlari(k.rec).includes(PLAN_YOK));
+    const v = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); throw new Error('ag'); } }, takipAcik);
+    await v.sandbox._pgKapiOnayliTekrar();
+    v.sandbox._pgKapiKapat();
+    assert.ok(hataToastlari(v.rec).includes(PLAN_YOK));
+  });
+
+  test(`HT-V-30 (${ad}): onaydan sonra görev eklenemezse plan kalır: ayrı uyarı, tazeleme sürer, plan-yok uyarısı yok`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => { throw new Error('ag'); } }, takipAcik);
+    rec.olay.length = 0;
+    await assert.doesNotReject(sandbox._pgKapiOnayliTekrar());
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /tohumlama|tedavi planı/.test(m)), [GOREV_YOK + ': ag']);
+    assert.ok(rec.olay.includes('pull'));
+  });
+
+  test(`HT-V-31 (${ad}): normal yol değişmez: plan ve görev bir kez, kapı kancası bırakılmaz`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: () => UYGUN, ekleYanit: () => ({ ok: true, olustu: true }) }, takipAcik);
+    assert.deepStrictEqual(rec.rpc.filter(r => r.ad === 'tedavi_sablon_uygula').map(r => r.p.p_pg_onay), [false]);
+    assert.strictEqual(ekleler(rec).length, 1);
+    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'));
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)']);
+    assert.ok(!sandbox.window.__pgKapiVazgec);
+  });
+
+  test(`HT-V-32 (${ad}): normal yolda görev RPC'si düşerse plan uygulandı der, "şablon uygulanamadı" demez; akış sürer`, async () => {
+    const { rec, sandbox } = await kapi({ sablonYanit: () => UYGUN, ekleYanit: () => { throw new Error('ag'); } }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /tohumlama|şablon/i.test(m)), [GOREV_YOK + ': ag']);
+    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün)'), 'plan yazıldı');
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    assert.ok(!sandbox.window.__pgKapiVazgec, 'kapı yok');
+  });
+
+  test(`HT-V-33 (${ad}): PG onayından sonra açık vakanın planı, Kapat düğmesi ve ilaç önbelleği tazelenir, emsal sırayla`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    sandbox._curCase = { id: 'C-9' };
+    sandbox._drugsCache = ['eski'];
+    rec.olay.length = 0;
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(sonuc(rec, ...TAZELE), ['pull', 'drugs', 'render:C-9', 'kapat:C-9']);
+  });
+
+  test(`HT-V-34 (${ad}): başka vaka açıksa onun planına ve düğmesine dokunulmaz; önbellek yine tazelenir`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    sandbox._curCase = { id: 'C-X' };
+    rec.olay.length = 0;
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(sonuc(rec, ...TAZELE), ['pull', 'drugs']);
+  });
+
+  test(`HT-V-35 (${ad}): Kapat düğmesi tazelenemezse hata yutulur, onay akışı düşmez`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }), kapatRed: true }, takipAcik);
+    sandbox._curCase = { id: 'C-9' };
+    await assert.doesNotReject(sandbox._pgKapiOnayliTekrar());
+    assert.ok(rec.olay.includes('kapat:C-9'));
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /^❌/.test(m)), []);
+  });
+
+  test(`HT-V-38 (${ad}): pull, ilaç ya da plan çizimi düşse de Kapat düğmesi tazelenir: açık günlü vaka kapatılamasın`, async () => {
+    for (const o of [{ pullRed: true }, { drugsRed: true }, { renderRed: true }]) {
+      const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }), ...o }, takipAcik);
+      sandbox._curCase = { id: 'C-9' };
+      rec.olay.length = 0;
+      await assert.doesNotReject(sandbox._pgKapiOnayliTekrar(), JSON.stringify(o));
+      assert.ok(rec.olay.includes('kapat:C-9'), JSON.stringify(o));
+    }
+  });
+
+  test(`HT-V-36 (${ad}): çift dokunuşta onaylı tekrar bir kez gider, istek sürerken kapı kilitli`, async () => {
+    let bitir;
+    const { sandbox, rec } = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); return new Promise(res => { bitir = () => res(UYGUN); }); }, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    const d = kapiDugmeleri(sandbox);
+    const ilk = d.dokun();
+    assert.strictEqual(d.dokun(), null, 'ikinci dokunuş düşer');
+    assert.deepStrictEqual([d.onay.disabled, d.vazgec.disabled, d.gerekce.disabled], [true, true, true], 'gerekçe yazılıp onay yeniden açılamaz');
+    bitir();
+    await ilk;
+    assert.strictEqual(rec.rpc.filter(r => r.ad === 'tedavi_sablon_uygula' && r.p.p_pg_onay).length, 1);
+    assert.strictEqual(ekleler(rec).length, 1);
+  });
+
+  test(`HT-V-37 (${ad}): onaylı tekrar hatasında kilit açılır, yeniden denenir`, async () => {
+    let n = 0;
+    const { sandbox, rec } = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); if (!n++) throw new Error('ag'); return UYGUN; }, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    const d = kapiDugmeleri(sandbox);
+    await d.dokun();
+    assert.deepStrictEqual([d.onay.disabled, d.vazgec.disabled, d.gerekce.disabled], [false, false, false]);
+    await d.dokun();
+    assert.strictEqual(rec.rpc.filter(r => r.ad === 'tedavi_sablon_uygula' && r.p.p_pg_onay).length, 2);
+    assert.strictEqual(ekleler(rec).length, 1);
+  });
+}
+
+// ── U2-PG: şablonlu vakada kapının "Boş ata ve uygula"sı (§18.8, sahip 2026-11-05) ──
+// Kapı detayında tohumlama_id varsa düğme Boş-ata'dır; şablon kolunda onay = tek RPC'de Boş + plan, kapı PG uygulamaz.
+const PG_RED_TOH = 'PG_KAPI:REQUIRE_ACK_PENDING:{"tohumlama_id":"T-1"}';
+const BOS_ATA = 'tedavi_sablon_bos_ata_uygula';
+const pgSablonToh = p => { if (!p.p_pg_onay) throw new Error(PG_RED_TOH); throw new Error('onaylı tekrar bu kapıda kullanılmaz'); };
+const bosAtalar = rec => rec.rpc.filter(r => r.ad === BOS_ATA).map(r => r.p);
+const BOS_ATA_P = { p_case_id: 'C-9', p_sablon_id: 'S-1', p_tohumlama_id: 'T-1', p_gerekce: 'gerekçe', p_baslangic_tarihi: null };
+// Boş-ata düğmesi sahte DOM'da elle bağlanır; dokunuş disabled düğmede koşmaz (tarayıcı gibi).
+function bosAtaDugmesi(sandbox) {
+  const onay = makeElement('button');
+  sandbox.document.__setEl('pg-kapi-onayla', onay);
+  return { onay, dokun: () => (onay.disabled ? null : sandbox._pgKapiBosAtaUygula()) };
+}
+// Kapı durumu: _pgKapiAc tohumlama bağlamını yazar, _pgKapiKapat siler (sahte DOM remove'u izlemez).
+const kapiAcik = sandbox => !!sandbox.window.__pgKapiToh;
+
+for (const [ad, takipAcik] of KOLLAR) {
+  test(`HT-V-40 (${ad}): Boş ata ve uygula tek RPC'de Boş + planı yazar, görev bir kez eklenir, kapı PG uygulamaz`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablonToh, bosAtaYanit: () => UYGUN, ekleYanit: () => ({ ok: true, olustu: true }) }, takipAcik);
+    sandbox._curCase = { id: 'C-9' };
+    const d = bosAtaDugmesi(sandbox);
+    rec.rpc.length = 0; rec.olay.length = 0; rec.toast.length = 0;
+    await d.dokun();
+    assert.deepStrictEqual(rec.rpc.map(r => r.ad), [BOS_ATA, EKLE], 'önce Boş + plan, sonra görev; onaylı tekrar yok');
+    assert.deepStrictEqual(bosAtalar(rec), [BOS_ATA_P]);
+    assert.deepStrictEqual(rec.bosVeDevam, [], 'PG modu ve dry-run çağrılmaz: kapı PG uygulamaz');
+    assert.deepStrictEqual(rec.toast.filter(([m, h]) => !h && m.startsWith('✅')).map(([m]) => m), ['✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'], 'tek ✅');
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)'], 'plan-yok uyarısı yok');
+    assert.ok(rec.pull.some(t => Array.isArray(t) && t.includes('tohumlama') && t.includes('hayvanlar')), 'tohumlama ve hayvan tazelenir');
+    assert.ok(rec.olay.includes('kapat:C-9'), 'Kapat düğmesi tazelenir');
+    assert.ok(!kapiAcik(sandbox), 'kapı kapandı');
+    assert.ok(!sandbox.window.__pgKapiBosAta && !sandbox.window.__pgKapiVazgec, 'kancalar temizlendi');
+  });
+
+  test(`HT-V-41 (${ad}): Boş ata reddedilirse kapı açık kalır, düğme açılır, görev yok; yeniden denenir; vazgeçince plan uyarısı`, async () => {
+    let n = 0;
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablonToh, bosAtaYanit: () => { if (!n++) throw new Error('PG_KAPI_BOS_ATA:TOH_SONUCLU:{}'); return UYGUN; }, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    const d = bosAtaDugmesi(sandbox);
+    rec.toast.length = 0;
+    await d.dokun();
+    assert.deepStrictEqual(ekleler(rec), []);
+    assert.deepStrictEqual(hataToastlari(rec), ['❌ Boş atanmadı, plan yazılmadı: JENERIK:PG_KAPI_BOS_ATA:TOH_SONUCLU:{}']);
+    assert.ok(kapiAcik(sandbox) && !d.onay.disabled, 'kapı açık, düğme yeniden basılabilir');
+    await d.dokun();
+    assert.strictEqual(bosAtalar(rec).length, 2);
+    assert.strictEqual(ekleler(rec).length, 1);
+    assert.ok(!hataToastlari(rec).includes(PLAN_YOK));
+    const v = await kapi({ sablonYanit: pgSablonToh, bosAtaYanit: () => { throw new Error('ag'); } }, takipAcik);
+    await bosAtaDugmesi(v.sandbox).dokun();
+    v.sandbox._pgKapiKapat();
+    assert.deepStrictEqual(hataToastlari(v.rec).filter(m => m === PLAN_YOK), [PLAN_YOK]);
+    assert.ok(!v.sandbox.window.__pgKapiBosAta, 'vazgeçince kanca düşer');
+  });
+
+  test(`HT-V-42 (${ad}): çift dokunuşta Boş ata bir kez gider`, async () => {
+    let bitir;
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablonToh, bosAtaYanit: () => new Promise(res => { bitir = () => res(UYGUN); }), ekleYanit: () => ({ ok: true }) }, takipAcik);
+    const d = bosAtaDugmesi(sandbox);
+    const ilk = d.dokun();
+    assert.strictEqual(d.dokun(), null, 'ikinci dokunuş düşer');
+    bitir();
+    await ilk;
+    assert.strictEqual(bosAtalar(rec).length, 1);
+    assert.strictEqual(ekleler(rec).length, 1);
+  });
+}
+
+test('HT-V-43: şablon dışı kapı değişmez: kanca yoksa Boş ata PG modu yolundan gider', async () => {
+  const { sandbox, rec } = await kapi({ sablonYanit: pgSablonToh }, false);
+  sandbox._pgKapiHata(new Error(PG_RED_TOH), async () => {}, 'hizli_uygulama');
+  assert.ok(!sandbox.window.__pgKapiBosAta, 'yeni kapıda şablon kancası yok');
+  await bosAtaDugmesi(sandbox).dokun();
+  assert.deepStrictEqual(rec.bosVeDevam.map(p => p.p_tohumlama_id), ['T-1'], 'bugünkü dry-run yolu');
+  assert.deepStrictEqual(bosAtalar(rec), []);
+});

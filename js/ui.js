@@ -63,7 +63,7 @@ async function _keepScroll(contentEl,fn){
 const _katTipMap={
   asi:    ['ASI_PLANLI','ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
-  muayene:['MUAYENE','VETERINER_KONTROL'],   // K14: GEBELIK_KONTROL Üreme'ye taşındı (§18.16)
+  muayene:['MUAYENE','VETERINER_KONTROL','HAYVAN_TAKIP_MUAYENE'],   // K14: GEBELIK_KONTROL Üreme'ye taşındı (§18.16)
   tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
   ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT','GEBELIK_KONTROL','TAKIP_MUAYENE'],   // P3+K14: "işin ucunda gebelik varsa üreme" — GEBELIK_KONTROL Muayene'den, TAKIP_MUAYENE eklendi
   bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
@@ -544,7 +544,7 @@ function _dashIleriGebeBandi(ileriGebeler){
   });
   return band('amber',title,rows.join(''));
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList,takipSatirlari){
   const _dd=ddMap||{};
   /**
    * Görev tipinin 'TEDAVI_GUN' olmadığı durumlarda boş string döndürür; aksi takdirde açıklama alanındaki day_id değeri üzerinden _dd dizisinden karşılık gelen değeri döndürür.
@@ -560,6 +560,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
    */
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
   let h='';
+  if((takipSatirlari||[]).length) h+=htBandHtml(takipSatirlari); // §20.3: en üstte; eski çağrılar parametresiz
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
     h+=`<div class="sh"><span class="sh-title">🔴 Geciken Görevler</span><button class="sh-link" onclick="goTo('tasks')">Tümü →</button></div>`;
@@ -2021,7 +2022,7 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=bugun();
-    const [animals,diseases,tasks,stock,births60,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
+    const [animals,diseases,tasks,stock,births60,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum,acikTakipler]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi&&!t.iptal),
@@ -2032,6 +2033,7 @@ async function loadDash(){
       getData('vaccines'),
       getData('kizginlik_log'),
       getData('tohumlama'),
+      getData('hayvan_takip',t=>!t.kapanis_tarihi),
     ]);
     const critStk=stock.filter(s=>s.stok_durum==='kritik').length;
     const negStk=stock.filter(s=>s.stok_durum==='tukendi').length;
@@ -2121,7 +2123,7 @@ async function loadDash(){
 
     // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
     // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge,ovStat)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge,ovStat)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList,htDashSatirlari(acikTakipler,animals))+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -2944,7 +2946,7 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene, sonraOrRpcAd, rpcAd){
     const onaylaDugme = detay.tohumlama_id
       ? `<button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiBosAtaUygula()">Boş ata ve uygula</button>`
       : `<button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiOnayliTekrar()">Onayla ve uygula</button>`;
-    body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b>${kz?` — ${esc(kz)}`:''}${detay.tohumlama_tarihi?` · ${fmtTarih(detay.tohumlama_tarihi)}`:''}${detay.deneme_no?` · deneme ${esc(String(detay.deneme_no))}`:''}.<br><span style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
+    body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b>${kz?` — ${esc(kz)}`:''}${detay.tohumlama_tarihi?` · ${fmtTarih(detay.tohumlama_tarihi)}`:''}${detay.deneme_no?` · deneme ${esc(String(detay.deneme_no))}`:''}.<br><span id="pg-kapi-aciklama" style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
       <label style="font-size:.7rem;font-weight:600;display:block;margin:10px 0 4px">Gerekçe *</label>
       <input id="pg-kapi-gerekce" class="fi" placeholder="Örn: 35. gün kontrolü negatif" oninput="document.getElementById('pg-kapi-onayla').disabled=!this.value.trim()">
       <div style="display:flex;gap:8px;margin-top:14px">
@@ -2973,6 +2975,10 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene, sonraOrRpcAd, rpcAd){
   window.__pgKapiToh = detay.tohumlama_id || null;
   window.__pgKapiRpcAd = ad || null;
   window.__pgKapiSonra = sonra || null;
+  window.__pgKapiBosAta = null; // şablon kancası çağıran tarafından kapı açıldıktan sonra verilir (submitCase)
+  // §18.8: kanca _pgKapiHata dönüşünde eşzamanlı verilir; şablonlu kolda kapı PG uygulamaz → metin mikro görevde düzelir.
+  Promise.resolve().then(() => { const a = document.getElementById('pg-kapi-aciklama');
+    if (a && typeof window.__pgKapiBosAta === 'function') a.textContent = 'PG gebeliği sonlandırabilir. "Boş ata ve uygula": tohumlama Boş atanır ve seçilen tedavi planı yazılır.'; });
 }
 /**
  * PG_KAPI hata mesajını analiz eder, hata kodunu ve detayını ayırarak ilgili fonksiyonu çağırır.
@@ -2997,8 +3003,11 @@ function _pgKapiKapat(){
   const box = document.getElementById('pg-kapi-bs');
   if (box) box.remove();
   window.__pgKapiTekrar = null; window.__pgKapiToh = null; window.__pgKapiRpcAd = null;
-  window.__pgKapiSonra = null;
+  window.__pgKapiSonra = null; window.__pgKapiBosAta = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
+  // Çağıranın onaysız kapanış kancası (submitCase): onaylı başarı önce siler, tek sefer koşar.
+  const vazgec = window.__pgKapiVazgec; window.__pgKapiVazgec = null;
+  if (typeof vazgec === 'function') vazgec();
 }
 /**
  * PG kapısı genel onaylı-tekrar kapanışı (Faz 4, ROOT RULING 3, §18.8):
@@ -3014,6 +3023,10 @@ async function _pgKapiOnayliTekrar(){
   const sonra = window.__pgKapiSonra || null;
   if (typeof tekrar !== 'function') return;
   if (!gerekce) { toast('⚠️ Gerekçe zorunlu', true); return; }
+  // Çift dokunuş: istek sürerken kapı kilitli; gerekçe de kilitli, oninput onayı yeniden açmasın.
+  const kilitli = [...(document.getElementById('pg-kapi-bs')?.querySelectorAll('button, input') || [])];
+  const kilit = kapali => kilitli.forEach(d => { d.disabled = kapali; });
+  kilit(true);
   try {
     const rpcAd = window.__pgKapiRpcAd || null;
     const tekrarSonuc = await tekrar(true, gerekce);
@@ -3024,6 +3037,7 @@ async function _pgKapiOnayliTekrar(){
       toast('❌ ' + (tekrarSonuc.mesaj || tekrarSonuc.error || tekrarSonuc.message || 'işlem uygulanamadı'), true);
       return;
     }
+    window.__pgKapiVazgec = null;
     _pgKapiKapat();
     toast('✅ Onaylandı, işlem uygulandı');
     // F2 KAPI-2 madde 2: çağıran kendi başarı kapanışını (sonra) geçirdiyse o
@@ -3041,13 +3055,17 @@ async function _pgKapiOnayliTekrar(){
     }
     if (typeof renderSafe === 'function') renderSafe();
   } catch (e2) {
+    kilit(false);
     // Yeniden PG reddi: kapı aynı tekrar kapanışıyla yeniden açılır
     // (yeni history entry YOK — _pgKapiAc koruması; sonra korunur).
     if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar, sonra, window.__pgKapiRpcAd || null)) return;
     toast('❌ ' + (e2?.message || e2), true);
   }
 }
-// [Boş ata ve uygula] (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
+// [Boş ata ve uygula] iki kol: (1) şablon kancası (window.__pgKapiBosAta; submitCase ve caseSablonUygula
+// verir) Boş + seçilen planı TEK RPC'de yazar (tedavi_sablon_bos_ata_uygula, §18.8, 20261031200007);
+// başarı toast'u çağıranın sonra()'sındadır. (2) Kanca yoksa aşağıdaki P9 yolu.
+// (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
 // PG modu tek transaction'da Boş ataması + PG uygulaması yapar; eski
 // tohumlama_sonuc_bos + __pgKapiTekrar iki-RPC zinciri KALKTI (yarım durum
 // "Boş kaydedildi, PG uygulanamadı" artık imkânsız — T-11). Kapı = seçicinin
@@ -3055,16 +3073,31 @@ async function _pgKapiOnayliTekrar(){
 // son_pg'sinden (yazmasız; seçicinin "son kullanılan PG" ön dolusuyla AYNI kaynak) —
 // sunucu PG_URUN_GEREKLI/PG_DOZ_GEREKLI'nin UI ikizi: çözümsüzse yazma YAPILMAZ.
 /**
- * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular, dry-run
- * ile son PG ürününü çözer, sonra TEK çağrıyla tohumlamayı Boş yapıp PG'yi uygular.
+ * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular. Şablon kancası varsa
+ * Boş + seçilen planı kancanın tek RPC'siyle yazar (kapı PG uygulamaz); yoksa dry-run ile son PG
+ * ürününü çözer, sonra TEK çağrıyla (tohumlamaBosVeDevam) tohumlamayı Boş yapıp PG'yi uygular.
  * @returns {Promise<void>} İşlem sonunda değer döndürmez; başarıda kapı modalı kapatılır, hata durumunda hata mesajı gösterilir ve buton geri açılır.
- * @rpc tohumlama_sonuc_bos
  */
 async function _pgKapiBosAtaUygula(){
   const btn = document.getElementById('pg-kapi-onayla');
   const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
   if (!gerekce || !window.__pgKapiToh) return;
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  // §18.8 şablonlu vaka (sahip 2026-11-05): çağıran kancası Boş + seçilen planı TEK işlemde yazar
+  // (tedavi_sablon_bos_ata_uygula); kapı PG uygulamaz, plandaki PG tek PG'dir. Ret: kapı açık, tekrar denenir.
+  const kanca = window.__pgKapiBosAta, sonra = window.__pgKapiSonra;
+  if (typeof kanca === 'function') {
+    try { await kanca(window.__pgKapiToh, gerekce); } catch (e) {
+      toast('❌ Boş atanmadı, plan yazılmadı: ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : e?.message || e), true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+      return;
+    }
+    window.__pgKapiVazgec = null;
+    _pgKapiKapat();
+    await pullTables(['tohumlama', 'hayvanlar']).catch(() => {});
+    if (typeof sonra === 'function') await sonra();
+    return;
+  }
   try {
     let urun = null, doz = null;
     try {
@@ -3425,7 +3458,7 @@ function _devamSeciciRender() {
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input class="fi" data-input="devam-girdi" data-alan="erteleGun" type="number" min="1" max="60" value="${escAttr(String(st.erteleGun))}" style="width:56px;text-align:center;padding:7px 10px;font-weight:600">
             <span style="font-size:.8rem;color:var(--ink3)">gün</span>
-            <input class="fi" data-input="devam-girdi" data-alan="erteleSaat" type="time" value="${escAttr(st.erteleSaat)}" style="padding:7px 10px;font-weight:600" title="Saat (boş = saatsiz)">
+            ${saatAlaniHtml('devam-ertele-saat', { deger: st.erteleSaat, bosIzinli: true, attr: 'data-input="devam-girdi" data-alan="erteleSaat" style="padding:7px 10px;font-weight:600" title="Saat (boş = saatsiz)"' })}
             <span id="devam-onizleme" style="font-size:.78rem;color:var(--ink2);font-weight:600;background:var(--card2);padding:6px 10px;border-radius:8px">${esc(_erteleOnizleme(bugun(), st.erteleGun, st.erteleSaat))}</span>
           </div>
         </div>`;
@@ -3531,6 +3564,7 @@ function _devamKizginlikGecis() {
 async function _devamSeciciOnayla() {
   const st = window.__devamSecici;
   if (!st?.acik || st.isleniyor) return;
+  if (st.secim === 'ERTALE' && saatYarimMi('devam-ertele-saat')) return;
   if (st.secim === 'ERTALE' && !st.onay21) {
     const n = _takip21Onay(st.baglam, st.onbilgi, st.erteleGun, bugun());
     if (n) {
@@ -3708,11 +3742,11 @@ function _erteleModal(gorevId){
     box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
       <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Görevi Ertele</div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:12px">Mevcut hedef: ${fmtTarih(t.hedef_tarih)} ${(t.hedef_saat||'').slice(0,5)}</div>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <div style="flex:1 1 100%"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
           <input id="ert-tarih" type="text" placeholder="gg.aa.yyyy" value="${bugunIso}" class="fi" style="width:100%"></div>
-        <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Saat (boş = mevcut)</label>
-          <input id="ert-saat" type="time" class="fi" style="width:100%" placeholder="${(t.hedef_saat||'09:00').slice(0,5)}"></div>
+        <div style="flex:1 1 100%"><label style="font-size:.7rem;font-weight:600">Saat (boş = mevcut)</label>
+          ${saatAlaniHtml('ert-saat', { bosIzinli: true, attr: `placeholder="${escAttr((t.hedef_saat||'09:00').slice(0,5))}"` })}</div>
       </div>
       <div id="ert-onizleme" style="font-size:.72rem;color:var(--blue);margin:8px 0"></div>
       <button id="ert-btn" class="btn" style="width:100%;padding:10px;font-weight:700" onclick="_erteleKaydet('${escAttr(gorevId)}')">Ertele</button>
@@ -3759,6 +3793,7 @@ function _erteleKapat(){
 async function _erteleKaydet(gorevId){
   // E6: modal açıkken bağlantı düşerse Ertele tıklaması RPC'ye ulaşmaz
   if (_ertelemeOfflineGuard('gorev-ertele-kaydet')) return;
+  if (saatYarimMi('ert-saat')) return;
   const btn = document.getElementById('ert-btn');
   const tarih = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
   const saat = document.getElementById('ert-saat')?.value || null;
@@ -4253,7 +4288,7 @@ function _erteleBtnHtml(t){
   if(t.tamamlandi||t.iptal) return '';
   // §18.17: GEBELIK_KONTROL/TAKIP_MUAYENE ertelemesi YALNIZ birleşik sonuç
   // ekranından (ERTALE) — genel ertele butonu bu tiplerde çizilmez (§10d #3).
-  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE') return '';
+  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'||t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE') return ''; // §20.6: genel Ertele yok
   const kural=ertelemeKuralGetir(t.gorev_tipi);
   if(!kural||!kural.ertelenebilir) return '';
   if(!_ertelemeOnline()) return '';
@@ -4648,7 +4683,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'&&t.gorev_tipi!=='GEBELIK_KONTROL'&&t.gorev_tipi!=='TAKIP_MUAYENE'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'&&t.gorev_tipi!=='GEBELIK_KONTROL'&&t.gorev_tipi!=='TAKIP_MUAYENE'&&t.gorev_tipi!=='HAYVAN_TAKIP_MUAYENE'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -5023,6 +5058,11 @@ async function loadAnimals(){
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
+    // 📌 rozet haritası: hayvan başına açık takipler (R4)
+    const htAciklar=await getData('hayvan_takip',t=>!t.kapanis_tarihi);
+    const htAcikMap={};
+    htAciklar.forEach(t=>{ (htAcikMap[t.hayvan_id]=htAcikMap[t.hayvan_id]||[]).push(t); });
+    globalThis._htAcikMap=htAcikMap;
     // Bekleyen tohumlama haritası (sadece sonuc=Bekliyor — badge için)
     const bosTohs=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
     globalThis._bosTohMap={};
@@ -5107,11 +5147,12 @@ function _animalTagsHtml(a,gebeSet){
   const _dGun=_yeniDogumGun(a);
   if(_dGun!=null) dogumBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">🐣 ${_dGun} gün önce doğum yaptı</span>`;
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
+  const takipBadge=((globalThis._htAcikMap||{})[a.id]||[]).map(t=>`<span class="tag" style="color:var(--blue);font-weight:700">📌 ${esc(htSebepEtiket(t))}</span>`).join('');
   // Repeat breed badge (backend view'dan gelir: repeat_breed_active, repeat_breed_past)
   let repeatBadge='';
   if(a.repeat_breed_active) repeatBadge+=`<span class="repeat-badge active">🔁 Tekrar Aşım</span>`;
   if(a.repeat_breed_past)   repeatBadge+=`<span class="repeat-badge past">↻ Tekrar</span>`;
-  return `<span class="tag tb">${esc(a.padok||'?')}</span><span class="tag tk">${esc(a.grup||'')}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${repeatBadge}`;
+  return `<span class="tag tb">${esc(a.padok||'?')}</span><span class="tag tk">${esc(a.grup||'')}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${takipBadge}${repeatBadge}`;
 }
 /**
  * Bir hayvan kaydının HTML kartını oluşturur. Kart, hayvanın kimlik bilgilerini, yaşını, ırkını ve etiketlerini içerir.
@@ -6241,7 +6282,7 @@ async function _protokolUygula(idx){
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Uygulama zamanı (opsiyonel)</label>
         <input id="pu-tarih" type="text" placeholder="gg.aa.yyyy" class="fi" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"></div>
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Saat</label>
-        <input id="pu-saat" type="time" class="fi" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"></div>
+        ${saatAlaniHtml('pu-saat', { cipler: false, attr: 'style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"' })}</div>
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
@@ -6275,6 +6316,7 @@ async function _protokolUygulaKaydet(hayvanId, idx){
   const rota = document.getElementById('pu-rota')?.value || 'IM';
   if (!stok) { toast('Stok seçilmedi', true); return; }
   if (!doz || isNaN(doz) || doz <= 0) { toast('Geçerli doz girin', true); return; }
+  if (saatYarimMi('pu-saat')) return;
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
@@ -6868,11 +6910,11 @@ let _DET_TAZELE_DEBOUNCE_MS=250;
 // Kartın GERÇEK okuma evreni (SPEC §3.3, R1-H01) — tek sabit, kaynak gruplarıyla:
 //   openDet pull+getData evreni: hayvanlar, cases, diseases, dogum, gorev_log,
 //     tohumlama, kizginlik_log, uygulama_log, vaccination_log, vaccines, drugs,
-//     drug_products, drug_classes
+//     drug_products, drug_classes, hayvan_takip
 //   _detRenderGecmis → _gecmisCollectSources evreni: islem_log, stok_hareket,
 //     treatment_days, drug_administrations, protokol_instance, stok
 // openDet okuma grafiği değişirse bu sabit birlikte güncellenir.
-const _DET_TABLOLAR=['hayvanlar','cases','diseases','dogum','gorev_log','tohumlama','kizginlik_log','uygulama_log','vaccination_log','vaccines','drugs','drug_products','drug_classes','islem_log','stok_hareket','treatment_days','drug_administrations','protokol_instance','stok'];
+const _DET_TABLOLAR=['hayvanlar','cases','diseases','dogum','gorev_log','tohumlama','kizginlik_log','uygulama_log','vaccination_log','vaccines','drugs','drug_products','drug_classes','hayvan_takip','islem_log','stok_hareket','treatment_days','drug_administrations','protokol_instance','stok'];
 window.__detSayac={openDet:0,epoch:0}; // test/demo oracle'ı (A1/A7/A16)
 /**
  * Hayvan kartının (#det) açık olup olmadığını söyler — 'on' sınıfı VE aktif kart kimliği şart.
@@ -7165,14 +7207,16 @@ function filterA(){
  * @param {Array} tohs Gebelik sonuçları listesi.
  * @param {Number} aktifHst Aktif hastalar sayısı.
  * @param {Array} activeCases Aktif vaka listesi.
+ * @param {Array} [acikTakipler] Hayvanın açık takipleri (📌 rozetleri).
  * @returns {String} Chip elemanlarını içeren HTML string.
  */
-function _detChipsHtml(a,tohs,aktifHst,activeCases){
+function _detChipsHtml(a,tohs,aktifHst,activeCases,acikTakipler=[]){
   return [
     {cls:'chip-k',txt:a.grup||'?'},
     {cls:'chip-k',txt:a.padok||'?'},
     aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
     a.kisir?{style:'background:rgba(255,160,0,.15);color:var(--amber)',txt:'💲 Kısır'}:null,
+    ...acikTakipler.map(t=>({style:'color:var(--blue)',txt:`📌 ${htSebepEtiket(t)}`})),
     (()=>{const gToh=tohs.filter(t=>t.sonuc==='Gebe').sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))[0]; if(!gToh)return null; const gun=Math.floor((Date.now()-new Date(gToh.tarih))/86400000); return {cls:'chip-g',txt:`🤰 ${gun}. gün · Tahmini: ${dFwd(gToh.tarih,280)}`};})(),
   ].filter(Boolean).map(c=>`<div class="chip ${c.cls||''}"${c.style?` style="${c.style}"`:''}>${esc(c.txt)}</div>`).join('');
 }
@@ -7187,9 +7231,13 @@ function _detChipsHtml(a,tohs,aktifHst,activeCases){
  * @param {number|null} yasRaw Hayvanın ham yaş değeri (gün cinsinden).
  * @param {number} yasGun Hayvanın yaşını göstermek için formatlanmış metin.
  * @param {string} displayId Hayvanın küpe numarası veya benzeri gösterim kimliği.
+ * @param {Array} [acikTakipler] Hayvanın açık takipleri.
  * @returns {string} Hayvan detay sayfası için HTML kodu.
  */
-function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId){
+function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId,acikTakipler=[]){
+  const _htDugme=(fn,metin)=>`<button class="btn btn-o" style="margin-top:6px;padding:9px" data-hid="${escAttr(a.id)}" onclick="${fn}(this.dataset.hid)">${metin}</button>`;
+  // §5.1: çıkmış hayvanda takip düğmesi yok; RPC de reddeder.
+  const takipDugmeleri=a.durum!=='Aktif'?'':_htDugme('htAcPencere','📌 Takibe al')+(acikTakipler.length?_htDugme('htMuayenePencere','🔍 Muayene planla')+_htDugme('htKapatPencere','✓ Takibi kapat'):'');
   const infoFields=[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Cinsiyet',v:a.cinsiyet||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Doğum Kg',v:a.dogum_kg?a.dogum_kg+' kg':'—'},{l:'Canlı Ağırlık',v:a.canli_agirlik?a.canli_agirlik+' kg':'—'},{l:'Boy',v:a.boy?a.boy+' cm':'—'},{l:'Renk',v:a.renk||'—'},{l:'Ayırt Edici',v:a.ayirici_ozellik||'—'},{l:'Durum',v:a.durum||'—'},{l:'Baba (Sperma)',v:a.baba_bilgi||'—'}];
   const anneObj=a.anne_id?getState('animals').find(x=>x.id===a.anne_id):null;
   const anneKupe=anneObj?.kupe_no||anneObj?.devlet_kupe||a.anne_id;
@@ -7221,6 +7269,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
       <div class="ss-item"><div class="ss-val">${diseases.length}</div><div class="ss-lbl">Toplam Vaka</div></div>
       <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
     </div>
+    ${acikTakipler.length?htKartBlokHtml(acikTakipler,tasks):''}
     <div class="info-grid">
       ${infoFields.map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${esc(i.v)}</div></div>`).join('')}
     </div>
@@ -7237,6 +7286,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı Uygulama</button>
+    ${takipDugmeleri}
     <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>
     ${typeof degisikliklerHayvanIcin === 'function' ? `<button class="btn btn-o" style="margin-top:6px;padding:9px" data-action="dg-hayvan-degisiklikleri" data-hid="${escAttr(a.id)}" data-kupe="${escAttr(displayId)}">🧾 Bu hayvanın değişiklikleri</button>` : ''}`;
 }
@@ -7620,10 +7670,10 @@ async function openDet(id, keepTab){
   // Soy sekmesi aktifse controller yükler, değilse sekme ilk aktive olduğunda yükler.
   const _pedPane=document.getElementById('tab-pedigree');
   if (typeof pedigreeSetFocus === 'function') pedigreeSetFocus(id, !!(_pedPane && _pedPane.classList && _pedPane.classList.contains('on')));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes'], {detInternal:true}).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes','hayvan_takip'], {detInternal:true}).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(myGen!==_detGen) return;
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs]=await Promise.all([
+    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs,tumAcikTakip]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -7635,10 +7685,12 @@ async function openDet(id, keepTab){
       getData('vaccination_log',v=>v.animal_id===id),
       getData('kizginlik_log',k=>k.hayvan_id===id),
       getData('uygulama_log',u=>u.hayvan_id===id),
+      getData('hayvan_takip',t=>!t.kapanis_tarihi),
     ]);
     if(myGen!==_detGen) return;
     // K7: id/küpe referansıyla eşleşen birden çok kayıt varsa AKTİF olan önce
     const a=aArr.find(x=>x.durum==='Aktif')||aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
+    const acikTakipler=tumAcikTakip.filter(t=>t.hayvan_id===a.id); // id küpe de olabilir: çözülen hayvanla eşleşir
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
@@ -7651,9 +7703,9 @@ async function openDet(id, keepTab){
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
     document.getElementById('det-name').textContent=displayId;
     document.getElementById('det-meta').textContent=`${a.irk||'—'} · ${a.padok||'?'}`;
-    document.getElementById('det-chips').innerHTML=_detChipsHtml(a,tohs,aktifHst,activeCases);
+    document.getElementById('det-chips').innerHTML=_detChipsHtml(a,tohs,aktifHst,activeCases,acikTakipler);
 
-    document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
+    document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId,acikTakipler);
 
     const allDiseasesList=await idbGetAll('diseases');
     // H-02: myGen alt helper'lara geçirilir — helper içi await'ler askıda kalırken
@@ -7795,7 +7847,9 @@ function _openIslemDetayRow(l, anchor){
   // panel butonu ÖLÜydü (sahibin "geri al butonu her yerde yok" sözü bu
   // yüzde yaşıyordu) — çözücü kararı doğrudan kullanılır.
   const geriAlabilir=!!_gmGeriAlHedef(l);
-  const satirlar=_islemDetaySatirlariHtml(l.payload);
+  // §5.6: üç takip tipi payload yazmaz; not ve sebep paneli boş bırakmaz.
+  const htAlt=typeof gmHtIslemAlt==='function'?gmHtIslemAlt(l):'';
+  const satirlar=_islemDetaySatirlariHtml(l.payload)||(htAlt?`<div style="font-size:.78rem;color:var(--ink)">${esc(htAlt)}</div>`:'');
   const gaBtn=geriAlabilir&&l.id
     ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" data-action="dg-det-geri-al" data-det="${escAttr(String(l.id))}">↩ Geri Al</button>`
     : '';
@@ -9096,6 +9150,7 @@ function _gecmisEntryHtml(e, overrideOc){
     if(data.tip==='ASI_KAYDI') sub=esc(snap.vaccine_name||'');
     else if(data.tip==='ASI_ERTELEME') sub=esc(snap.erteleme_notu||snap.vaccine_name||'');
     else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
+    else if(/^HAYVAN_TAKIP_/.test(data.tip||'')) sub=esc(gmHtIslemAlt(data));
     else { const _irk=snap.irk||snap.grup||''; sub=esc(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(_irk).trim())?'':_irk); } // W8-D3: ham UUID alt satıra da girmez
     // U1 md.2: işlem aynası kartı KOŞULSUZ tıklanabilir — hayvan detayındaki
     // aynanın gittiği yer: islem detay paneli (openIslemDetay hattı). id yoksa
@@ -9175,7 +9230,7 @@ function _gecmisSearchText(e){
   }
   else if(e.type==='islem'){
     const snap=d.snapshot||{};
-    parts.push(_gmIslemTipEtiket(d.tip),snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||''); // U1: etiket + yedek aramaya da düşer
+    parts.push(_gmIslemTipEtiket(d.tip),snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'',/^HAYVAN_TAKIP_/.test(d.tip||'')?gmHtIslemAlt(d):''); // U1: etiket + yedek aramaya da düşer
   }
   // TG1 tek-gün görünümü kategorileri
   else if(e.type==='asi'){parts.push(d._asiAdi||'','aşı','aşı kaydı');}
@@ -10568,7 +10623,7 @@ function _renderSablonBuilder(){
         <label style="display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--ink2);margin:4px 0 7px">Başlangıçtan gün
           <input class="fi" type="number" min="0" step="1" value="${gun.offset}" data-change="sablon-gun-ofset" data-gi="${gi}" style="width:75px;margin:0;padding:5px 7px"></label>
         ${seansRows}
-        ${tohumlama?`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;font-size:.8rem;border-top:1px solid var(--card3);margin-top:6px"><span style="font-weight:700;min-width:42px">🐄 ${esc(tohumlama.planned_time)}</span><span style="flex:1;font-weight:700">Planlı tohumlama <span style="font-weight:400;color:var(--ink3);font-size:.72rem">Sperma görevde seçilir</span></span><input class="fi" type="time" value="${tohumlama.planned_time}" data-change="sablon-tohumlama-saat" style="width:92px;padding:4px"><button data-action="sablon-tohumlama-sil" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></div>`:''}
+        ${tohumlama?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;font-size:.8rem;border-top:1px solid var(--card3);margin-top:6px"><span style="font-weight:700;min-width:42px">🐄 ${esc(tohumlama.planned_time)}</span><span style="flex:1;font-weight:700">Planlı tohumlama <span style="font-weight:400;color:var(--ink3);font-size:.72rem">Sperma görevde seçilir</span></span><button data-action="sablon-tohumlama-sil" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button><div style="flex:1 1 100%">${saatAlaniHtml(`sablon-tohumlama-saat-${gi}`, { deger: tohumlama.planned_time, attr: 'data-change="sablon-tohumlama-saat" style="padding:4px"' })}</div></div>`:''}
         <button class="btn-sm" data-action="sablon-seans-ac" data-gi="${gi}" style="margin-top:6px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne seans/ilaç ekle</button>
         ${!tohumlama?`<button class="btn-sm" data-action="sablon-tohumlama-gun-ekle" data-gi="${gi}" style="margin-top:6px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(126,87,194,.10);color:#7151a6;border:1px dashed rgba(126,87,194,.45);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne tohumlama ekle</button>`:''}
       </div>
@@ -10693,14 +10748,12 @@ function sablonSeansAc(gi){
     }).join('');
     return '<div style="margin-bottom:8px"><div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--card3)">'+grp+'</div>'+items+'</div>';
   }).join('');
-  const saatChips = HIZLI_SAATLER.map(t=>`<button type="button" class="btn-sm" data-action="sablon-saat-chip" data-t="${t}" style="padding:5px 10px;background:rgba(42,107,181,.1);color:var(--blue);border:none;border-radius:6px;cursor:pointer;margin-right:4px;font-weight:700">${t}</button>`).join('');
   const wrap = document.getElementById('sablon-gun-body-'+gi);
   const form = document.createElement('div');
   form.style.cssText='border:1px dashed var(--card3);border-radius:10px;padding:10px;margin-top:6px;background:var(--card2)';
   form.innerHTML =
     '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">⏰ Saat</div>'+
-    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
-    `<input id="sbs-time" class="fi" type="time" value="${HIZLI_SAATLER[0]}" style="margin:0;flex:1;min-width:100px">`+saatChips+'</div>'+
+    '<div style="margin-bottom:8px">'+saatAlaniHtml('sbs-time', { deger: HIZLI_SAATLER[0] })+'</div>'+
     '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>'+
     '<div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">'+
     (groupHtml||'<div style="color:var(--ink3);font-size:.78rem;padding:8px">İlaç bulunamadı</div>')+'</div>'+
@@ -10714,12 +10767,6 @@ function sablonSeansAc(gi){
   _sablonSeansForm = form;
 }
 
-/**
- * Belirtilen saati 'sbs-time' ID'li elemanın değerine atar.
- * @param {string} t Atanacak saat değeri.
- * @returns {void} Hiçbir değer döndürmez.
- */
-function sablonSaatChip(t){ const i=document.getElementById('sbs-time'); if(i) i.value=t; }
 /**
  * Şablon oluşturucuda seçilen güne tohumlama planı ekler; şablon adını senkronize eder, seçilen günün ofseti ve '08:00' planlı saatiyle tohumlama planını ayarlar ve şablon oluşturucuyu yeniden render eder.
  * @param {number|string} gi - Tohumlama planının ekleneceği günün şablon düzenleyicideki indeksi.
@@ -10787,6 +10834,7 @@ function sablonSeansEkle(gi){
  * @tablo sablon_hastalik_eslem (tazeleme), tedavi_sablonu_kalem (tazeleme), tedavi_sablonu (tazeleme)
  */
 async function sablonKaydet(){
+  if(_sablonEdit.gunler.some((_, gi) => saatYarimMi(`sablon-tohumlama-saat-${gi}`))) return;
   _syncSablonAd();
   const s=_sablonEdit;
   if(!s.ad.trim()){ toast('Şablon adı zorunlu', true); return; }
@@ -11567,6 +11615,8 @@ async function openTaskDet(id){
   // butonuna ULAŞILAMIYORDU ve görevin tek çıkışı gerçekten tohumlamaktı.
   // Artık modal normal açılıyor; tamamla butonu aşağıda forma yönlendiriliyor.
   _curTaskDet=t;
+  // R5 (§20.6): jenerik detay hiç açılmaz, Ertele/İptal/düzenleme yolları böyle kapanır. Çevrimdışıysa htSonucAc uyarır.
+  if(t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE'){ await htSonucAc(t.id); return; }
   // K15 (T-04/T-05): muayene görevinde tıklama birleşik sonuç ekranına gider;
   // seçici açılamazsa (bayrak kapalı/offline) akış jenerik detay yedeğine düşer —
   // orada "✅ Tamamlandı" gizlidir (P3b UI ikizi), 🗑 İptal yolu açık kalır
@@ -11621,7 +11671,7 @@ async function openTaskDet(id){
 
   // K15: muayene görevi yedeğinde jenerik tamamlama butonu GİZLİ — sonuç YALNIZ
   // birleşik ekrandan (P3b gorev_tamamla guard'ının UI ikizi).
-  if((t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE')&&tamamBtn) tamamBtn.style.display='none';
+  if((t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'||t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE')&&tamamBtn) tamamBtn.style.display='none';
 
   // ILERI_GEBE_ASI / ASI_RAPEL / ASI_HATIRLATMA: standart tamamla gizle, aşı butonu göster.
   // ASI_RAPEL özel olarak işlenmeli — generic 'Tamamlandı' görevi kayıtsız kapatıyordu
@@ -11829,6 +11879,7 @@ async function detayTamamla(){
   // K15: muayene görevleri jenerik doneTask'e ASLA düşmez (P3b gorev_tamamla
   // guard'ının UI ikizi) — iki tip AYNI birleşik sonuç ekranını açar (T-04/T-05).
   if(_curTaskDet.gorev_tipi==='GEBELIK_KONTROL'||_curTaskDet.gorev_tipi==='TAKIP_MUAYENE') return _muayeneSonucAc(_curTaskDet.id);
+  if(_curTaskDet.gorev_tipi==='HAYVAN_TAKIP_MUAYENE') return htSonucAc(_curTaskDet.id);
   // §3: etken_kod varsa ama stok_id yoksa → önce stok seçtir
   if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
     return _gorevStokSecVeTamamla(_curTaskDet);
@@ -12212,7 +12263,10 @@ async function openDoneTaskDet(id){
   const geriBtn=document.getElementById('dd-geri-al-btn');
   const daysSince=Math.floor((Date.now()-new Date(t.tamamlanma_tarihi||0))/86400000);
   const childDone=rapelChild&&rapelChild.tamamlandi;
-  if(daysSince>7||childDone){
+  if(t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE'){ // R6 (§20.7): geri açmak kapalı takibe açık görev bırakırdı
+    geriBtn.disabled=true;
+    geriBtn.textContent='Muayene sonucu geri alınamaz';
+  } else if(daysSince>7||childDone){
     geriBtn.disabled=true;
     geriBtn.textContent=childDone?'Rapel yapılmış (geri alınamaz)':'7 günden eski';
   } else {
@@ -12756,7 +12810,7 @@ function caseDaySaatAc(dayId, currentTime) {
   const saatVal = currentTime ? currentTime.slice(0,5) : '';
   box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:14px">🕐 Tedavi Saatini Ayarla</div>
-    <input type="time" id="saat-input" value="${saatVal}" style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1.1rem;background:var(--card);color:var(--ink);outline:none;margin-bottom:12px">
+    <div style="margin-bottom:12px">${saatAlaniHtml('saat-input', { deger: saatVal, attr: 'style="font-size:1.1rem"' })}</div>
     <div style="display:flex;gap:8px">
       <button onclick="caseDaySaatKaydet('${dayId}')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Kaydet</button>
       <button onclick="document.getElementById('saat-modal').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">İptal</button>
@@ -13964,6 +14018,9 @@ function tarihAlaniTakvimAc(el, o){
 //   kullanmıyor — bileşene iletimi tarihAlaniTakvimAc'ta garantili)
 // · sınırsız      → görev hedef tarihleri (ta/te) — gelecek meşru
 const TARIH_ALANLARI = {
+  'ht-ac-tarih':    { min: 'bugun', temizlenebilir: true }, // takip muayenesi: geçmiş olamaz (§20.8)
+  'ht-mu-tarih':    { min: 'bugun', temizlenebilir: true },
+  'ht-so-tarih':    { min: 'bugun', temizlenebilir: true }, // boş = sonraki muayene yok
   'k-tarih':        { max: 'bugun' },                       // kızgınlık tarihi
   'i-tarih':        { max: 'bugun' },                       // tohumlama tarihi
   'tr-tarih':       { max: 'bugun' },                       // tekrar aşım tarihi
@@ -14096,7 +14153,11 @@ async function caseSablonUygula(sablonId){
     r = await cagri(false, null);
     await sonra();
   } catch(e) {
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'tedavi_sablon_uygula')) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'tedavi_sablon_uygula')) {
+      // §18.8 şablonlu vaka: Boş ata ve uygula = Boş + bu plan tek işlemde (başlangıç günü dahil).
+      window.__pgKapiBosAta = _vakaBosAtaKanca(_curCase.id, sablonId, x => { r = x; }, tarih);
+      return;
+    }
     toast(getUserMessage(e), true);
   }
 }
@@ -14119,11 +14180,12 @@ function caseTohumlamaEkleAc() {
   div.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:12px;margin-bottom:10px';
   div.innerHTML =
     '<div style="font-size:.74rem;font-weight:700;color:var(--ink2);margin-bottom:8px">🐄 Planlı Tohumlama Ekle</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih' +
+    '<div style="margin-bottom:10px">' +
+      '<label style="display:block;font-size:.7rem;color:var(--ink3);margin-bottom:8px">Tarih' +
       '<input type="hidden" id="cdt-tarih" value="' + bugunTr + '">' +
       '<button type="button" id="cdt-tarih-btn" data-action="cdt-takvim-ac" style="width:100%;margin-top:3px;background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:var(--ink);cursor:pointer;text-align:left">📅 ' + fmtTarih(bugunTr) + '</button></label>' +
-      '<label style="flex:1;font-size:.7rem;color:var(--ink3)">Saat<input id="cdt-saat" class="fi" type="time" value="08:00" style="margin-top:3px"></label>' +
+      '<label for="cdt-saat" style="display:block;font-size:.7rem;color:var(--ink3);margin-bottom:3px">Saat</label>' +
+      saatAlaniHtml('cdt-saat', { deger: '08:00' }) +
     '</div>' +
     '<div style="display:flex;gap:6px">' +
       '<button onclick="caseTohumlamaEkleOnayla(this)" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;cursor:pointer">Ekle</button>' +
@@ -14161,7 +14223,9 @@ async function caseTohumlamaEkleOnayla(btn) {
   if (!_curCase) return;
   const tarih = document.getElementById('cdt-tarih')?.value;
   const saat  = document.getElementById('cdt-saat')?.value || '08:00';
-  if (!tarih) { toast('Tarih seçin', true); return; }  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
+  if (!tarih) { toast('Tarih seçin', true); return; }
+  if (saatYarimMi('cdt-saat')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
     await rpc('vaka_tohumlama_ekle', { p_case_id: _curCase.id, p_tarih: tarih, p_saat: saat });
     document.getElementById('cd-toh-form')?.remove();
@@ -17456,8 +17520,6 @@ async function caseSeansEkleFormAc(dayId) {
     return '<div style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">' + grp + '</div>' + items + '</div>';
   }).join('');
 
-  const saatChips = HIZLI_SAATLER.map(h => `<button type="button" class="ek-chip" onclick="seansAddSaatSec('${h}',this)">${h}</button>`).join('');
-
   const form = document.createElement('div');
   form.className = 'cd-seans-form';
   form.style.cssText = 'margin-top:8px;background:var(--card2);border-radius:10px;padding:10px';
@@ -17465,9 +17527,7 @@ async function caseSeansEkleFormAc(dayId) {
     '<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⏰ Seans Planı</div>' +
     mevcutHtml +
     '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin:8px 0 6px">＋ Yeni Seans — Saat</div>' +
-    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
-    `<input id="seans-add-time" class="fi" type="time" value="${HIZLI_SAATLER[0]}" style="margin:0;flex:1;min-width:90px">` +
-    saatChips + '</div>' +
+    '<div style="margin-bottom:8px">' + saatAlaniHtml('seans-add-time', { deger: HIZLI_SAATLER[0] }) + '</div>' +
     '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>' +
     '<div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">' +
     (groupHtml || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilaç yok</div>') + '</div>' +
@@ -17479,19 +17539,6 @@ async function caseSeansEkleFormAc(dayId) {
     '<button onclick="this.closest(\'.cd-seans-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Kapat</button>' +
     '</div>';
   container.appendChild(form);
-}
-
-/**
- * Belirtilen saati 'seans-add-time' inputuna ayarlar ve butona 'aktif' sınıfını eklerken diğer tüm '.ek-chip' elemanlarından bu sınıfı kaldırır.
- * @param {string} h Ayarlanacak saat değeri.
- * @param {HTMLElement} btn Aktif sınıfı eklenecek buton elemanı.
- * @returns {void} Fonksiyon bir değer döndürmez.
- */
-function seansAddSaatSec(h, btn) {
-  const inp = document.getElementById('seans-add-time');
-  if (inp) inp.value = h;
-  btn?.parentElement?.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
-  btn?.classList.add('aktif');
 }
 
 /**
@@ -17537,7 +17584,7 @@ function seansDuzenleAc(seansId) {
     .map(y => `<option value="${y}"${(s.route || '') === y ? ' selected' : ''}>${y}</option>`).join('');
   row.innerHTML = `
     <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%">
-      <input id="sd-time-${seansId}" class="fi" type="time" value="${esc(fmtSeansSaat(s.planned_time) || '08:00')}" style="margin:0;width:88px">
+      <div style="flex:1 1 100%">${saatAlaniHtml('sd-time-' + seansId, { deger: fmtSeansSaat(s.planned_time) || '08:00' })}</div>
       <input id="sd-dose-${seansId}" class="fi" type="number" min="0.01" step="0.01" value="${s.dose ?? ''}" placeholder="Doz" style="margin:0;width:64px">
       ${_dozHintBtnHtml('sd-dose-' + seansId, s.drug_product_id || '', document.getElementById('m-case-det')?.classList.contains('on') ? (_curCase?.animal_id || '') : '')}
       <input id="sd-unit-${seansId}" class="fi" type="text" value="${esc(s.unit || 'ml')}" placeholder="Birim" style="margin:0;width:52px">

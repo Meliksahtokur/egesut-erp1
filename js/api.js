@@ -26,13 +26,13 @@ const DEMO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const SB_URL  = IS_DEMO ? DEMO_URL : PROD_URL;
 const PROD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const SB_KEY  = IS_DEMO ? DEMO_KEY : PROD_KEY;
-const DB_VER  = 24;
+const DB_VER  = 25;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
                   'vaccination_log','vaccine_diseases','vaccine_protocol_steps','vaccination_schedule','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
                   'uygulama_log','protokol_instance','protokol_ayar',
-                  'tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'];
+                  'tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem','hayvan_takip'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -505,6 +505,12 @@ const RPC_TABLES = {
   tedavi_sablon_uygula:  ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
   tedavi_sablon_tohumlama_gorev_ekle: ['gorev_log'],
   vaka_tohumlama_ekle:   ['gorev_log','islem_log'],
+  // Hayvan Takip: online-only, RPC_MAP'e BILINCLI girmez.
+  hayvan_takip_ac:             ['hayvan_takip','gorev_log','islem_log'],
+  hayvan_takip_kapat:          ['hayvan_takip','gorev_log','islem_log'],
+  hayvan_takip_muayene_planla: ['hayvan_takip','gorev_log','islem_log'],
+  hayvan_takip_muayene_sonuc:  ['hayvan_takip','gorev_log','islem_log'],
+  hayvan_takip_muayene_vaka:   ['hayvan_takip','gorev_log','islem_log'],
 };
 
 // ── OFFLINE REPLAY RPC EŞLEMESİ (Faz 4 — TEK KAYNAK) ─────────────────────
@@ -825,6 +831,11 @@ async function _pullTablesNow(tables = []) {
        * @tablo cop_kutusu (select)
        */
       cop_kutusu:        () => db.from('cop_kutusu').select('*'),
+      /**
+       * 'hayvan_takip' tablosunun tümünü seçer; tarih aralığı yok (idbClearAndPut diğer satırları silerdi).
+       * @tablo hayvan_takip (select)
+       */
+      hayvan_takip:      () => db.from('hayvan_takip').select('*'),
       // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
     };
     // B27: tohumlanabilir_hayvanlar/gebelik_ozet fetcher'ları kaldırıldı — IDB
@@ -1023,7 +1034,7 @@ function stopBackgroundSync() {
 // ── REALTIME SUBSCRIPTIONS ──────────────────
 // supabase_realtime publication aktif → WebSocket kanalları
 
-const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs','treatment_days','treatment_day_uygulamalar','protokol_ayar'];
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs','treatment_days','treatment_day_uygulamalar','protokol_ayar','hayvan_takip'];
 let _realtimeChannel = null;
 
 /**
@@ -1047,6 +1058,7 @@ function initRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  () => {})
     .on('postgres_changes', { event: '*', schema: 'public', table: 'protokol_ayar' }, () => pullTables(['protokol_ayar']))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'hayvan_takip' }, () => pullTables(['hayvan_takip']).then(renderSafe))
     .subscribe(status => {
       // B35: online handler'ın polling restart'ı realtime durumunu bilsin
       globalThis._realtimeSubscribed = (status === 'SUBSCRIBED');

@@ -118,6 +118,8 @@ DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanla
 → Sonuç Boş (gövde DEĞİŞMEDİ — §10h H1). Çağrı: forms.js:1271; P9'dan beri UI `tohSonuc` Boş dalı
   ÖNCE `tohumlama_bos_ve_devam` seçicisini açar (sonuç+devam tek işlem), seçici açılamazsa
   (bayrak kapalı / seçici hatası) fallback confirm + bu RPC (forms.js:4440).
+  `20261031200007`: Boş yazımı iç yardımcıya (`_tohumlama_bos_cekirdek`, authenticated'a kapalı) taşındı; imza,
+  ACL, dönüşler ve `_acik_disi_gorev_kur` yan etkisi aynı. Migration canlı gövde md5'i 20260924000001 değilse durur.
 
 **`tohumlama_sonuc_bekliyor(p_tohumlama_id)`** → jsonb
 → Hatalı kayıt düzeltme → Bekliyor. Çağrı: forms.js:1275.
@@ -222,6 +224,9 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
   DEĞİŞMEZ. Korunan dallar: `p_iptal=true` (T5) ve SUTTEN_KESME/padok tamamlaması aynen çalışır.
   Yan etki (P3b ruling 3): kapanmış muayene görevinin tekrar-tamamlama çağrısı da artık bu kodu alır
   (eski: 'zaten tamamlanmış').
+→ **Hayvan Takip guard'ı (20261031200003):** liste üç tiptir, üçüncüsü `HAYVAN_TAKIP_MUAYENE`; bu tip
+  `tohumlama_bos_ve_devam`'a değil `hayvan_takip_muayene_sonuc`'a gider, kod aynıdır. `p_iptal=true` dalı
+  guard'a girmez: görevi kapatır, takibi kapatmaz (domain-rules §20.9).
 → `p_iptal=true` (T5, 20260925000006): offline replay iptal-PATCH'i iptal olarak kapatır
   (`iptal=true, tamamlandi=true`, audit 'Görev iptal edildi (offline replay)'); tek-imza — eski
   (text,text) overload kalktı (iki default'lu overload PostgREST adlı-çağrıda 42725 veriyordu).
@@ -391,6 +396,17 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 
 **`tedavi_sablon_uygula(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
 → Açılışta forms.js:568 (2-arg, çapa=start_date); aktif vakada `ui.js:caseSablonUygula` (3-arg; seçilen tarih şablonun 1. günü, mig. 20260909000001). NULL çapa ⇔ eski start_date davranışı.
+
+**`tedavi_sablon_bos_ata_uygula(p_case_id uuid, p_sablon_id uuid, p_tohumlama_id text, p_gerekce text, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
+→ `20261031200007`, domain-rules §18.8 şablonlu vaka. Tek işlemde son tohumlamayı Boş atar (islem_log `TOHUMLAMA_SONUC`,
+  snapshot'ta `gerekce`), `tedavi_sablon_uygula`'yı onaysız ve `p_baslangic_tarihi` ile çağırır (Boş sonrası kapı ALLOW),
+  sonra `_acik_disi_gorev_kur` (aileli vakada görev yok, ailesizde normal Boş yolunun görevi).
+  Dönüş = plan sonucu + `tohumlama_id`, `islem_id`. Ret (hiçbir şey yazılmaz): `PG_KAPI_BOS_ATA:<SEBEP>:<json>`,
+  SEBEP ∈ GEREKCE_GEREKLI, VAKA_YOK (aktif vaka yok), PG_YOK (şablonda PG kalemi yok), TOH_SON_DEGIL (son tohumlama
+  değil / başka hayvanın), TOH_SONUCLU (Bekliyor değil; çift çağrı dahil), HAYVAN_AKTIF_DEGIL, PLAN_RED; plan
+  istisnaları (ör. KISIR) da her şeyi geri alır. Hayvan kilidi FOR NO KEY UPDATE. ACL: authenticated + service_role.
+  Çağrı: forms.js `_vakaBosAtaKanca` (submitCase iki kol; ui.js `caseSablonUygula` başlangıç günüyle) → ui.js
+  `_pgKapiBosAtaUygula` (kapı kancası `window.__pgKapiBosAta`).
 
 **`tedavi_sablon_tohumlama_gorev_ekle(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
 → forms.js:569 + `ui.js:caseSablonUygula` (aynı çapa semantiği). **GT'de YOK** (audit).
@@ -721,7 +737,7 @@ Not: imzalar EKLEMELİ olduğundan eski argüman seti DEFAULT'larla yeni imzaya 
 | 7 | `bulk_ilac` dönüş anahtarı `takip_acik[]` | satır objesi | `{hayvan_id, kupe_no, kod:"TAKIP_ACIK", muayene_tarihi, muayene_saat}` |
 | 8 | `vaka_toplu_ac` dönüş anahtarı `takip_acik[]` | satır objesi | `{hayvan_id, kupe, kod:"TAKIP_ACIK", muayene_tarihi, muayene_saat}` (aynı `kupe` adı) |
 | 9 | `bulk_ilac` dönüş anahtarı `takip_onay_listesi[]` | satır objesi | `{hayvan_id, pg_kapi_karar, takip_acik (bool), takip_bilgi ({muayene_tarihi, muayene_saat} \| null)}` |
-| 10 | `gorev_tamamla` guard | `MUAYENE_SONUC_GEREKLI:{gorev_tipi}` | düz-metin suffix: `GEBELIK_KONTROL` \| `TAKIP_MUAYENE` |
+| 10 | `gorev_tamamla` guard | `MUAYENE_SONUC_GEREKLI:{gorev_tipi}` | düz-metin suffix: `GEBELIK_KONTROL` \| `TAKIP_MUAYENE` \| `HAYVAN_TAKIP_MUAYENE` |
 | 11 | dizi yolu küme uyuşmazlığı | `TAKIP_ONAY_KUME_UYUMSUZ:{json}` | `{liste_disi_id}` |
 
 Notlar: jsonb çıktıda anahtar sırası alfabetik (`muayene_saat` önce basılır); takip nedeniyle işlenmeyen
@@ -752,6 +768,47 @@ p_saat time)` → uuid — TAKIP_MUAYENE görevi (`kaynak='TAKIP:<toh_id>'`; aç
 `_takip_kapat(p_gorev_id uuid, p_neden text)` → void — tek satır NKU, idempotent (tamamlanmışa
 dokunmaz; görev yoksa `TAKIP_GOREV_YOK:<id>`) · `_tohumlama_gebe_uygula(p_tohumlama_id text,
 p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarmal + genel gebe RPC gövdesi).
+
+---
+
+## Hayvan Takip (migrations 20261031200001-000006; domain-rules §20)
+
+Migration dosyalarından yazıldı, canlı gövde kanıtı değildir; prod apply sahip kapısında. Beşi de SECURITY DEFINER; EXECUTE `authenticated, service_role`. Tablo `hayvan_takip`te `authenticated`
+yalnız SELECT alır, yazma bu RPC'lerden. Hepsi online-only: `RPC_TABLES`'ta var, `RPC_MAP`'te bilerek yok.
+Çağrı: `js/hayvan-takip-pencere.js` `_htGonder`. Kilit sırası: hayvanlar → hayvan_takip → gorev_log.
+Hayvan satırı `FOR NO KEY UPDATE` (son tanım `20261031200006`; `FOR UPDATE`, FK KEY SHARE tutan oturumla deadlock üretir). Hayvan UPDATE'iyle yine çakışır, çıkış sırası korunur (`tests/sql/hayvan_takip_kilit_test.sh`).
+Hatalar düz metin `RAISE EXCEPTION`; ret sırası parametre → varlık → durum, kodlar aşağıda bu sıradadır.
+
+**`hayvan_takip_ac(p_hayvan_id text, p_sebep_kodu text, p_aciklama text?, p_muayene_tarihi date?, p_muayene_saati time?)`** → jsonb `{ok, takip_id, gorev_id}`
+→ Ret: `HT_SEBEP_BOS`, `HT_ACIKLAMA_GEREKLI` (DIGER), `HT_TARIH_GEREKLI` (saat var, tarih yok), `HT_GECMIS_TARIH`,
+  `HT_HAYVAN_AKTIF_DEGIL` (hayvan yoksa da), `HT_SEBEP_ZATEN_ACIK` (`hayvan_takip_acik_sebep_uq`; DIGER muaf).
+→ Tarih doluysa görev aynı işlemde açılır, `gorev_id` aksi halde null. Log `HAYVAN_TAKIP_ACILDI`. Sebep listesini DB sınırlamaz (`js/config.js`).
+→ Görev açıklaması `_hayvan_takip_sebep_etiket` (iç yardımcı, EXECUTE yok; son tanım `20261031200004`, `HALSIZLIK` dahil): CASE'te olmayan kod ham kalır, yeni hazır sebep bu fonksiyona migration ister.
+
+**`hayvan_takip_kapat(p_takip_ids uuid[], p_not text?, p_kapatan_vaka_id uuid?)`** → jsonb `{ok, kapanan, hayvan_id}`
+→ Ret: `HT_BOS_LISTE`, `HT_TAKIP_YOK` (listede hiç takip yok), `HT_FARKLI_HAYVAN`, `HT_VAKA_UYUMSUZ`.
+→ Kapalı ve bulunmayan kimlik atlanır, `kapanan=0` hata değildir. Neden `ELLE`, vaka verilirse `VAKA`. Hayvan durumuna bakmaz.
+
+**`hayvan_takip_muayene_planla(p_takip_id uuid, p_tarih date, p_saat time?)`** → jsonb `{ok, gorev_id, yeni}`
+→ Ret: `HT_TARIH_GEREKLI`, `HT_GECMIS_TARIH`, `HT_TAKIP_YOK`, `HT_TAKIP_KAPALI`, `HT_HAYVAN_AKTIF_DEGIL`.
+→ Açık görev varsa tarih ve saati üzerine yazar (`yeni=false`; boş saat eskisini siler), yoksa açar. `islem_log` yazmaz.
+
+**`hayvan_takip_muayene_sonuc(p_gorev_id uuid, p_sonuc text, p_not text?, p_sonraki_tarih date?, p_sonraki_saat time?)`** → jsonb `{ok, sonuc, takip_id, yeni_gorev_id, kapandi}`
+→ Ret: `HT_SONUC_GECERSIZ` (`SURSUN`|`KAPANSIN` dışı), `HT_TARIH_GEREKLI` ve `HT_GECMIS_TARIH` (yalnız SURSUN), `HT_GOREV_YOK`,
+  `HT_GOREV_TIP_UYUMSUZ`, `HT_TAKIP_YOK` (`ref_takip_id` boş), `HT_GOREV_KAPALI`, `HT_TAKIP_KAPALI`.
+→ Görevi `gorev_tamamla`'ya gitmeden doğrudan tamamlar. Log `HAYVAN_TAKIP_MUAYENE`. KAPANSIN takibi `MUAYENE` nedeniyle kapatır;
+  SURSUN'da boş tarih yeni görev açmaz. Kilitli `gorev_tamamla` guard'ı için bkz. Görev Sistemi.
+
+**`hayvan_takip_muayene_vaka(p_gorev_id uuid, p_case_id uuid, p_not text?)`** → jsonb `{ok, sonuc:'VAKA', takip_id, case_id, kapandi}`
+→ Ret: `HT_GOREV_YOK`, `HT_GOREV_TIP_UYUMSUZ`, `HT_TAKIP_YOK` (`ref_takip_id` boş), `HT_GOREV_KAPALI`, `HT_TAKIP_KAPALI`,
+  `HT_VAKA_UYUMSUZ` (vaka bu hayvanın değil, yok ya da `cases.status <> 'active'`). Kilit sırası `muayene_sonuc` ile aynı.
+→ Sıra zorunlu, tek işlem: görev `tamamlandi` → log `HAYVAN_TAKIP_MUAYENE` (`snapshot.sonuc='VAKA'`, `kapatan_vaka_id`) → `_hayvan_takip_kapat_ic(takip,'VAKA',…)`. Yoksa görev iptal görünür.
+→ Yalnız bu görevin takibini kapatır; diğer takipler `hayvan_takip_kapat` ile sorulur. Vaka açmaz: yeni vaka yolunda `create_case` önce, ayrı işlemde koşar (`_vakaSonrasiAkis`), bağ hatasında vaka kalır.
+  Çağrı: `htMuayeneVakaBagla` (yeni vaka), `htVakaBagla` (mevcut aktif vaka).
+
+**Kapanış ortak yolu** `_hayvan_takip_kapat_ic` (iç yardımcı, EXECUTE yok): açık görevi `iptal=true, kapatan_ref='hayvan-takip-kapandi'` yapar, takip başına bir
+`HAYVAN_TAKIP_KAPANDI` yazar. **Çıkış:** `trg_hayvan_cikis_takip_kapat` (`hayvanlar`, Aktif'ten çıkışta) nedeni `CIKIS`, kapatan `sistem`.
+**Şema:** `gorev_log.ref_takip_id` (FK; `gorev_log_ref_takip_acik_uq` takip başına bir açık görev), `v_gorev_log_sync` kolonu taşır.
 
 ---
 
@@ -808,6 +865,7 @@ p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarm
 | `_trg_case_ureme_sessiz_iptal()` | cases → sessiz görev iptali |
 | `_trg_gorev_parent_kapandi()` | gorev_log (parent kapanınca çocuklar) |
 | `_trg_hayvan_cikis_gorev_iptal()` | hayvanlar durum (çıkışta görev iptali; 20260929000003: TAKIP_MUAYENE'ye ek `takip_kapanis_nedeni='CIKIS'` UPDATE'i) |
+| `_trg_hayvan_cikis_takip_kapat()` | hayvanlar trg_hayvan_cikis_takip_kapat (AFTER UPDATE OF durum; DEFINER; açık takipleri CIKIS ile kapatır) |
 | `_trg_kizginlik_sessiz_iptal()` | kizginlik_log |
 | `_trg_tohumlama_gebe_sessiz_iptal()` | tohumlama (gebe olunca) |
 | `_trg_tohumlama_sessiz_iptal()` | tohumlama |

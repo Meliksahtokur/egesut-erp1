@@ -285,7 +285,7 @@ let _ekSeciliTur = null;
  */
 function ekChipSec(btn) {
   _ekSeciliTur = btn.dataset.tur;
-  document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
+  document.querySelectorAll('#ek-chip-row .ek-chip').forEach(b => b.classList.remove('aktif'));
   btn.classList.add('aktif');
   document.getElementById('ek-stok-row').style.display = 'flex';
   _ekStokYukle(_ekSeciliTur);
@@ -336,7 +336,7 @@ function ekUygulamaEkle() {
   _ekListeGoster();
 
   document.getElementById('ek-doz').value = '';
-  document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
+  document.querySelectorAll('#ek-chip-row .ek-chip').forEach(b => b.classList.remove('aktif'));
   document.getElementById('ek-stok-row').style.display = 'none';
   _ekSeciliTur = null;
 }
@@ -786,7 +786,7 @@ async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix
  * kızgınlık tedavi bağlantısı kurar ve ilgili tabloları günceller.
  * @param {HTMLElement} btn Tıklanan buton (opsiyonel).
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
- * @rpc create_case, kizginlik_tedavi_baglanti_kur, tedavi_sablon_tohumlama_gorev_ekle, tedavi_sablon_uygula
+ * @rpc create_case, kizginlik_tedavi_baglanti_kur, tedavi_sablon_uygula
  * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function submitCase(btn) {
@@ -799,6 +799,10 @@ async function submitCase(btn) {
   const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
+  // Muayene sonucundan açıldıysa bağlam (§20.6): closeM siler, kapanıştan önce oku. d-hid düzenlenebilir; kızgınlık bağlam taşımaz.
+  const htMuayene = globalThis._kizginlikTedaviId ? null : globalThis._htMuayeneVaka;
+  if (htMuayene && hayvan.id !== htMuayene.hayvanId) { toast('⚠️ Bu vaka muayene edilen hayvana açılmalı', true); return; }
+
   // cila2 C1: kısır + OVSYNC-aile hastalığı → istemcide engelle (DB 000018 aynası)
   if (hayvan.kisir) {
     const ovsyncIds = await _ovsyncAileHastalikIdSet();
@@ -807,6 +811,7 @@ async function submitCase(btn) {
   }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
+  const kizginlikKayitId = globalThis._kizginlikTedaviId; // closeM m-disease işareti siler; kapanıştan önce oku
   try {
     const res = await rpc('create_case', {
       p_animal_id:  hayvan.id,
@@ -817,19 +822,16 @@ async function submitCase(btn) {
     // #63 — şablon seçildiyse tek tıkla tüm planı uygula
     const sablonId = globalThis._seciliSablonId;
     if (sablonId && res?.case_id) {
+      // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
+      let r = null;
+      const cagri = async (onay, gerekce) => (r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null }));
       try {
-        // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
-        const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
-        const r = await cagri(false, null);
-        const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res.case_id, p_sablon_id: sablonId });
-        if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
-        // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
-        // görev sessizce atlanır — kullanıcı nedenini görsün.
-        if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
-        toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
+        await cagri(false, null);
+        await _vakaSablonSonu(res.case_id, sablonId, r);
       } catch(e) {
         // Madde 2: PG reddinde return YOK — kapı ekranı açıldıysa akış kapanışa düşer.
-        if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
+        if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri, () => _vakaSablonOnaySonu(res.case_id, sablonId, r))) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
+        else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res.case_id, sablonId, x => { r = x; }); }
       }
     } else {
       toast('✅ Vaka açıldı');
@@ -840,16 +842,16 @@ async function submitCase(btn) {
     g('d-disease-id').value = '';
     g('d-disease-cat').style.display = 'none';
     { const sb = g('d-sablon-blok'); if (sb) sb.style.display = 'none'; }
-    await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']);
-    _drugsCache = [];
-    await loadDrugsCache();
+    await _vakaTazele(async () => {
+      await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']);
+      _drugsCache = [];
+      await loadDrugsCache();
+    });
     // Kızgınlık tedavi bağlantısı
-    if (globalThis._kizginlikTedaviId && res?.case_id) {
-      const kid = globalThis._kizginlikTedaviId;
-      globalThis._kizginlikTedaviId = null;
+    if (kizginlikKayitId && res?.case_id) {
       try {
         await rpc('kizginlik_tedavi_baglanti_kur', {
-          p_kayit_id: kid,
+          p_kayit_id: kizginlikKayitId,
           p_case_id:  res.case_id
         });
         toast('🔗 Kızgınlık tedaviye bağlandı');
@@ -859,8 +861,8 @@ async function submitCase(btn) {
     }
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
-      await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
-      openCaseDet(res.case_id);
+      await _vakaTazele(() => openDet(hayvan.id, _detAcik())); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
+      await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id), !!kizginlikKayitId, htMuayene);
     }
   } catch (e) {
     // P10: elle vaka aç yolu (create_case) TAKIP_ACIK kapısından geçer (P3b) —
@@ -875,17 +877,16 @@ async function submitCase(btn) {
       });
       const sablonId2 = globalThis._seciliSablonId;
       if (sablonId2 && res2?.case_id) {
+        // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
+        let r2 = null;
+        const cagri = async (onay, gerekce) => (r2 = await rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null }));
         try {
-          // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
-          const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
-          const r2 = await cagri(false, null);
-          const planli2 = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
-          if (r2?.atlanan?.length) toast(`⚠️ ${r2.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
-          if (planli2?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli2.sebep}`, true);
-          toast(`✅ Vaka açıldı + şablon uygulandı (${r2?.gun_sayisi||0} gün)${planli2?.olustu?' + tohumlama':''}`);
+          await cagri(false, null);
+          await _vakaSablonSonu(res2.case_id, sablonId2, r2);
         } catch (e3) {
           // Madde 2: PG reddinde return YOK — akış kapanışa düşer.
-          if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
+          if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri, () => _vakaSablonOnaySonu(res2.case_id, sablonId2, r2))) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
+          else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res2.case_id, sablonId2, x => { r2 = x; }); }
         }
         globalThis._seciliSablonId = null;
       } else {
@@ -895,8 +896,8 @@ async function submitCase(btn) {
       cl('d-hid'); cl('d-case-notes');
       await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(() => {});
       if (res2?.case_id) {
-        await openDet(hayvan.id);
-        openCaseDet(res2.case_id);
+        await _vakaTazele(() => openDet(hayvan.id));
+        await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id), !!kizginlikKayitId, htMuayene);
       }
       return res2;
     };
@@ -904,6 +905,67 @@ async function submitCase(btn) {
     toast(getUserMessage(e), true);
   }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
+}
+
+/**
+ * Plan uygulandıktan sonra planlı tohumlama görevi ve uyarılar: normal yol ve PG onayı aynı adımdan geçer. Görev kaynak anahtarıyla tekildir; görev hatası planı geri almaz.
+ * @rpc tedavi_sablon_tohumlama_gorev_ekle
+ */
+async function _vakaSablonSonu(caseId, sablonId, r) {
+  let planli = null;
+  try { planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: caseId, p_sablon_id: sablonId }); }
+  catch (e) { toast('⚠️ Plan uygulandı, planlı tohumlama görevi açılamadı: ' + e.message, true); }
+  if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+  // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
+  // görev sessizce atlanır — kullanıcı nedenini görsün.
+  if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
+  toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
+}
+
+/** PG onaylı tekrar başarılı (_pgKapiOnayliTekrar sonra): plan yazıldı; ekran tazelenir. */
+async function _vakaSablonOnaySonu(caseId, sablonId, r) {
+  await _vakaSablonSonu(caseId, sablonId, r);
+  await _vakaTazele(async () => {
+    await pullTables(RPC_TABLES.tedavi_sablon_uygula);
+    _drugsCache = [];
+    await loadDrugsCache();
+  });
+  if (typeof _curCase === 'undefined' || _curCase?.id !== caseId) return;
+  await _vakaTazele(() => renderCaseTimeline(caseId));
+  // Ayrı adım: close_case gün denetlemez, bayat düğme açık günlü vakayı kapattırır (emsal caseSablonUygula).
+  await _vakaTazele(() => _updateKapatBtn(caseId));
+}
+
+/**
+ * §18.8 şablonlu vaka kapısı (sahip 2026-11-05): "Boş ata ve uygula" tohumlamayı Boş atar ve seçilen planı
+ * tek işlemde yazar; dönen plan sonucu `yaz` ile çağıranın başarı kapanışına (sonra) gider.
+ * Vaka Aç (submitCase) ve vaka detayı (ui.js caseSablonUygula, `baslangic` = planın ilk günü) kullanır.
+ * @rpc tedavi_sablon_bos_ata_uygula
+ */
+function _vakaBosAtaKanca(caseId, sablonId, yaz, baslangic) {
+  return async (tohumlamaId, gerekce) => yaz(await rpc('tedavi_sablon_bos_ata_uygula',
+    { p_case_id: caseId, p_sablon_id: sablonId, p_tohumlama_id: tohumlamaId, p_gerekce: gerekce, p_baslangic_tarihi: baslangic || null }));
+}
+
+/** PG kapısı onaysız kapandı (_pgKapiKapat): vaka durur, plan yazılmadı. */
+function _vakaPlanUygulanmadi() { toast('⚠️ Vaka kayıtlı, tedavi planı uygulanmadı', true); }
+
+/** Vaka kayıtlıdır: tazeleme ya da kart hatası bağı ve soruyu kesmez, dış catch'e düşüp "vaka açılamadı" gibi görünmez (§20.6). */
+async function _vakaTazele(adim) {
+  try { await adim(); } catch (e) { console.warn('⚠️ Vaka sonrası tazeleme:', e); }
+}
+
+/** Takip sorusunu vakayı etkilemeden açar (§20.5, spec §6); hata yalnız uyarıdır. */
+async function _htVakaSonrasiGuvenli(hayvanId, caseId) {
+  try { await htVakaSonrasi(hayvanId, caseId); }
+  catch (e) { console.warn('⚠️ Vaka sonrası takip penceresi:', e); toast('⚠️ Vaka kayıtlı, takip penceresi açılamadı', true); }
+}
+
+/** Vaka detayı bitince muayene bağlanır, takip sorulur: pencere üstte kalır; detay hatası kayıtlı vakaya hata göstermez. */
+async function _vakaSonrasiAkis(hayvanId, caseId, detayAc, kizginliktan, muayene) {
+  try { await detayAc(); } catch (e) { console.warn('⚠️ Vaka detayı açılamadı:', e); }
+  if (muayene) await htMuayeneVakaBagla(muayene, caseId);
+  if (!kizginliktan) await _htVakaSonrasiGuvenli(hayvanId, caseId);
 }
 
 // ── TOPLU VAKA (m-bulk-case) — G-20260906-TOPLU-VAKA ──
@@ -962,10 +1024,9 @@ async function loadBulkCaseForm(){
   // (disabled/aktif) bcChipsRender'da kurulur. V2.3-W20: yazma TEK kapı
   // bcTarihYaz — görüntü DD.MM.YYYY + kanonik ISO birlikte kurulur.
   bcTarihYaz(bugun());
-  const tohumSaatEl = g('bc-tohum-saat'); if(tohumSaatEl) tohumSaatEl.value = '08:00';
+  saatYaz('bc-tohum-saat', '08:00');
   const tohumGunEl = g('bc-tohum-gun'); if(tohumGunEl) tohumGunEl.value = '0';
   const tohumChkEl = g('bc-tohum'); if(tohumChkEl) tohumChkEl.checked = false;
-  bcTohumSaatChipsRender();
   bcTarihIpucuGuncelle();
   if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
   bcPlanRender(); // gün kartları + açık seans formu (ilaç listesi dahil)
@@ -1332,20 +1393,6 @@ function bcTarihSecimEkle(secim, tarihISO, bugunStr){
   return { ok: true, secim: String(tarihISO), mesaj: null };
 }
 
-// HIZLI_SAATLER çipleri (config.js) — ek-chip deseni, bc-tohum-saat'i doldurur.
-/**
- * 'bc-tohum-saat-chips' seçili kutuya hızlı saat seçeneklerini (veya varsayılan saatleri) içeren butonlar oluşturarak ekler.
- * @returns {void}
- */
-function bcTohumSaatChipsRender(){
-  const kutu = g('bc-tohum-saat-chips');
-  if(!kutu) return;
-  const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
-  kutu.innerHTML = saatler.map(t =>
-    `<button type="button" class="ek-chip" data-action="bc-tohum-saat-chip" data-t="${t}">${t}</button>`
-  ).join('');
-}
-
 // ── TOPLU VAKA MANUEL TEDAVİ PLANI (V1.1 → V2.1 GÜN KARTLARI) ─────────
 // V2.1 (sahibe beyin fırtınası, 2026-09-06): plan editörü m-sablon builder
 // + seans planlayıcı diline taşındı — ÜST ÜSTE KATLANABİLİR GÜN KARTLARI
@@ -1619,14 +1666,10 @@ function _bcSeanslariCiz(gun){
  * @returns {string} Seans formunu oluşturan HTML string.
  */
 function _bcSeansFormHtml(gun){
-  const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
-  const chips = saatler.map(t => `<button type="button" class="ek-chip" data-action="bc-saat-chip" data-t="${t}">${t}</button>`).join('');
   return `
   <div style="border:1px dashed var(--card3);border-radius:10px;padding:10px;margin-top:6px;background:var(--card2)">
     <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">⏰ Yeni Seans — Saat</div>
-    <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-      <input id="bc-gsaat" class="fi" type="time" value="09:00" style="margin:0;flex:1;min-width:100px">${chips}
-    </div>
+    <div style="margin-bottom:8px">${saatAlaniHtml('bc-gsaat', { deger: '09:00' })}</div>
     <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>
     <div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">${_bcSeansDrugGruplariHtml()}</div>
     <div id="bc-sdoz-alani" style="display:none">
@@ -1784,6 +1827,7 @@ async function bcSablonKaydet(){
   // konvansiyonu — jsonb 'null' normalize dili). Şablon semantiği: plan
   // tarihi = vaka start_date + gun_ofset — 'Kaç gün sonra' ile aynı dil.
   const tohumIste = !!g('bc-tohum')?.checked;
+  if(tohumIste && saatYarimMi('bc-tohum-saat')) return;
   const tohumPayload = bcSablonTohumPayload(tohumIste, v('bc-tohum-gun'), v('bc-tohum-saat'));
   const kayitPayload = { kalemler };
   if(tohumPayload) kayitPayload.tohumlama_plani = tohumPayload;
@@ -1918,11 +1962,10 @@ async function bcSablonYukleUygula(sablon, kalemler){
   globalThis._bcKopyaAcikGun = null;
   const tohumChkEl = g('bc-tohum');
   const tohumGunEl = g('bc-tohum-gun');
-  const tohumSaatEl = g('bc-tohum-saat');
   if(tohumChkEl) tohumChkEl.checked = !!plan.tohumlama;
   if(plan.tohumlama){
     if(tohumGunEl) tohumGunEl.value = String(plan.tohumlama.gun_ofset);
-    if(tohumSaatEl) tohumSaatEl.value = plan.tohumlama.planned_time;
+    saatYaz('bc-tohum-saat', plan.tohumlama.planned_time);
   }
   bcSablonaDonustur(); // şablon radyosu → 'Şablonsuz' (gönderim p_items yolu)
   bcPlanRender();
@@ -2579,20 +2622,6 @@ function _bcSeansDozSatiri(ds){
   return row;
 }
 
-/**
- * Belirtilen saat değerini 'bc-gsaat' elemanına ayarlar ve butona 'aktif' sınıfını ekler.
- * Buton varsa, aynı ebeveyn içindeki tüm '.ek-chip' elemanlarından 'aktif' sınıfını kaldırır.
- * @param {string} t Ayarlanacak saat değeri.
- * @param {HTMLElement} btn 'aktif' sınıfını eklenmesi ve diğer chip'lerin pasif hale getirilmesi gereken buton elemanı.
- * @returns {void}
- */
-function bcSeansSaatChip(t, btn){
-  const i = g('bc-gsaat');
-  if(i) i.value = t;
-  if(btn && btn.parentElement) btn.parentElement.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
-  if(btn) btn.classList.add('aktif');
-}
-
 // [Seansı Ekle]: saat + işaretli ilaçların doz/birim'ini doğrular
 // (sablonSeansEkle aynası), kalem state'e YAZAR, seansı saate göre ASC
 // ekler, seans listesini cerrahi çizer; form AÇIK kalır, yalnız saat
@@ -2641,11 +2670,7 @@ function bcSeansEkle(gun){
   gunObj.seanslar.push({ saat, ilaclar });
   gunObj.seanslar.sort((a, b) => (a.saat || '').localeCompare(b.saat || ''));
   _bcSeanslariCiz(gun);
-  const saatInp = g('bc-gsaat');
-  if(saatInp){
-    saatInp.value = '09:00';
-    if(saatInp.parentElement) saatInp.parentElement.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
-  }
+  saatYaz('bc-gsaat', '09:00');
   bcButonEtiketi();
 }
 
@@ -3236,6 +3261,7 @@ async function submitBulkCase(btn){
   const tohumMod = bcTohumBlokDurumu(liste).mod;
   const tohumChkEl = g('bc-tohum');
   const tohumIste = !!(tohumMod === 'aktif' && tohumChkEl && tohumChkEl.checked);
+  if (tohumIste && saatYarimMi('bc-tohum-saat')) return;
   const tohumGun = tohumIste
     ? Math.max(0, Math.min(365, Number.parseInt(v('bc-tohum-gun'), 10) || 0))
     : 0;

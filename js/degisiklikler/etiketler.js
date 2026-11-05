@@ -47,6 +47,7 @@ const DG_TABLO_ETIKETLERI = {
   pedigree_nodes: 'Pedigree düğümü',
   pedigree_parentage: 'Pedigree ebeveynliği',
   semen_catalog: 'Sperma kataloğu',
+  hayvan_takip: 'Hayvan takibi',
 };
 
 // Tablodan bağımsız ortak alanlar
@@ -254,6 +255,11 @@ const DG_ALAN_ETIKETLERI = {
     tamamlandi: 'Tamamlandı', tamamlanma_tarihi: 'Tamamlanma', padok_hedef: 'Hedef padok',
     stok_dusuldu: 'Stok düşüldü', parent_id: 'Üst görev', ref_tohumlama_id: 'İlgili tohumlama',
     kapatan_ref: 'Kapatan kayıt', protokol_instance_id: 'Protokol', seans_admin_id: 'Seans',
+    ref_takip_id: 'İlgili takip',
+  },
+  hayvan_takip: {
+    sebep_kodu: 'Sebep', acilis_tarihi: 'Açılış', acan: 'Açan', kapanis_tarihi: 'Kapanış', kapatan: 'Kapatan',
+    kapanis_nedeni: 'Kapanış nedeni', kapanis_notu: 'Kapanış notu', kapatan_vaka_id: 'Kapatan vaka',
   },
   vaccination_log: {
     vaccination_date: 'Aşı tarihi', dose_given: 'Verilen doz', next_due_date: 'Sonraki doz',

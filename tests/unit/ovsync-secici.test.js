@@ -43,6 +43,9 @@ const GERCEK_TARIH = { fmtTarih: helpers.fmtTarih, dFwd: helpers.dFwd };
 // ── Yükleyiciler ──────────────────────────────────────────────────────
 
 // Saf yüzey: const'lar expose ile, fonksiyonlar sandbox'tan.
+// U2-S1: saat alanı gerçek helpers.js'ten gelir.
+const SAAT = loadBrowserModule('js/utils/helpers.js', { extra: { HIZLI_SAATLER: ['08:00', '16:00', '20:00'] } }).sandbox;
+
 function loadUiSaf(extraRpcHandlers = {}, extraTohumlamaBosVeDevam) {
   return loadBrowserModule(UI, {
     expose: ['_devamSecenekler', '_muayeneEkstra'],
@@ -56,6 +59,7 @@ function loadUiSaf(extraRpcHandlers = {}, extraTohumlamaBosVeDevam) {
       }),
       toast: () => {}, openConfirm: (t, d, on) => {}, pullTables: async () => {},
       loadDash: () => {}, loadTasks: () => {}, loadOvsyncDash: () => {},
+      saatAlaniHtml: SAAT.saatAlaniHtml, saatYarimMi: () => false,
       ...extraRpcHandlers,
     },
   });
@@ -356,6 +360,49 @@ test('P8 kapı: offline / dry-run hatası → seçici AÇILMAZ + "İnternet yok"
   await s._devamSeciciAc('bos', bosBaglam());
   assert.notEqual(s.window.__devamSecici?.acik, true, 'dry-run hatasında seçici açılamaz (bayat veriyle seçim yok)');
   assert.ok(toastlar.some(m => m.includes('İnternet yok')), '"İnternet yok" toast gerekli: ' + JSON.stringify(toastlar));
+});
+
+test('U2-S1 #13: erteleSaat çipli ama ön seçimsiz; boş saatsiz gider, çip p_saat yazar, yarım gönderilmez', async () => {
+  const onbilgi = {
+    ok: true, bayrak_kapali: false, varsayilan_gun: 7,
+    ovsync_kilitli: false, kilit_gerekce: null, kural_tarihi: '2026-10-12', kalan_gun: null,
+    son_pg: null, deneme_sayisi: 2, takip_acik: false, takip_bilgi: null,
+  };
+  const cagrilar = [];
+  const yuk = loadUiSaf({}, async (...a) => { cagrilar.push(a); return onbilgi; });
+  const s = yuk.sandbox;
+  await s._devamSeciciAc('muayene', { kupe_no: 'K1', gorev_tipi: 'GEBELIK_KONTROL', muayene_gorev_id: 'g1' });
+  const dryRun = cagrilar.length;
+  s._devamSeciciSec('ERTALE');
+  const govde = () => yuk.document.body.children[yuk.document.body.children.length - 1].innerHTML;
+  const alan = /<input id="devam-ertele-saat" class="fi" type="time" value="([^"]*)"[^>]*>/;
+  assert.strictEqual(alan.exec(govde())[1], '', 'ön seçim yok');
+  assert.match(alan.exec(govde())[0], /data-input="devam-girdi"/);
+  assert.match(alan.exec(govde())[0], /data-alan="erteleSaat"/);
+  assert.match(alan.exec(govde())[0], /title="Saat \(boş = saatsiz\)"/);
+  assert.strictEqual((govde().match(/data-action="saat-chip"/g) || []).length, 3, 'çipler var');
+  assert.ok(!/saat-chip aktif/.test(govde()), 'hiçbir çip seçili gelmez');
+  assert.ok(/data-hedef="devam-ertele-saat"[^>]*data-bos="1"/.test(govde()), 'ikinci dokunuş boşaltır');
+  const st = s.window.__devamSecici;
+  assert.strictEqual(s._devamRpcParams(st).p_saat, null, 'boş = saatsiz');
+  s._devamSeciciGirdi('erteleSaat', '16:00');
+  assert.strictEqual(s._devamRpcParams(st).p_saat, '16:00');
+  s._devamSeciciRender();
+  assert.ok(/saat-chip aktif"[^>]*data-t="16:00"/.test(govde()), 'yeniden çizimde değer ve çip kalır');
+  assert.strictEqual(alan.exec(govde())[1], '16:00');
+  s._devamSeciciGirdi('erteleSaat', '');
+  assert.strictEqual(s._devamRpcParams(st).p_saat, null, 'boşa dönünce saatsiz');
+  // Yarım giriş: gerçek saatYarimMi, RPC'ye gitmez.
+  const el = yuk.document.createElement('input');
+  el.validity = { badInput: true };
+  yuk.document.__setEl('devam-ertele-saat', el);
+  const h = loadBrowserModule('js/utils/helpers.js', { dom: yuk.document }).sandbox;
+  const toastlar = [];
+  h.toast = m => toastlar.push(m);
+  s.saatYarimMi = h.saatYarimMi;
+  await s._devamSeciciOnayla();
+  assert.strictEqual(cagrilar.length, dryRun, 'yarım saatte kayıt çağrısı yok');
+  assert.match(toastlar[0], /Saat/);
 });
 
 test('P8 kapı: başarılı dry-run → seçici açık; ön seçim OVSYNC; erteleGun=7; saat saatsiz', async () => {

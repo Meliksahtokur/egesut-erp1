@@ -12,7 +12,7 @@ Tam yol haritası: `../docs/demo-mirror-ROADMAP.md`. Mimari: Seçenek D (ayrı p
 |---|---|---|
 | (D0) | Demo şema+veri ilk doldurma — prod'dan `pg_dump via demo_reader` (BYPASSRLS). Detay ROADMAP D0. | D0 ✅ |
 | `00_grants.sql` | authenticated CRUD grant'ları (D0 pg_dump ACL taşımadı → 42501 fix) + ALTER DEFAULT PRIVILEGES | D0+ ✅ |
-| `01_fdw_bridge.sql` | `postgres_fdw` + `prod_srv` + `USER MAPPING` + `IMPORT FOREIGN SCHEMA` → `prod_fdw` canlı prod aynası | D1 ✅ |
+| `01_fdw_bridge.sql` | `postgres_fdw` + `prod_srv` + `USER MAPPING` + `IMPORT FOREIGN SCHEMA` → `prod_fdw` canlı prod aynası (`degisim_log` + 4 `stat_*` hariç) | D1 ✅ |
 | `02_demo_klonla.sql` | `demo_klon_log` + `demo_klonla()` RPC (atomik birebir klon, dinamik, `statement_timeout=300s`) | D2 ✅ |
 | `03_sema_diff.sql` | `demo_sema_diff()` — prod↔demo şema drift uyarısı (salt-okuma) | D-şema ✅ |
 
@@ -31,14 +31,15 @@ Tek transaction, atomik (yarım-klon yok):
 6. `ENABLE TRIGGER USER` geri aç. Set tablolarının sequence'lerini runtime bulup `setval`.
 7. `demo_klon_log`'a satır sayısı + süre + durum yaz. Dönüş: `{ok, rows, ms, tables, ekstra_bosalan}`.
 
-**Ters kapanış (referencing closure):** `prod_fdw`'de karşılığı olmayan ama set tablolarına FK ile referans veren demo-lokal tablolar (örn. `pedigree_nodes`, `pedigree_parentage`, `pg_application_event`, `semen_catalog`) klon setinde değildir ama set'i `TRUNCATE` etmeyi bloklar (Postgres 2BP01: "cannot truncate a table referenced in a foreign key constraint"). `demo_klonla()` bu tabloları recursive CTE ile (transitif) yakalar, TRUNCATE listesine katar ve **boşaltır ama prod'dan kopyalamaz** — içerik demo-lokaldir ve prod klonuna girmez. `TRUNCATE ... CASCADE` bilinçli olarak KULLANILMAZ: kapsam açık hesaplanır ve dönüşte `ekstra_bosalan` olarak loglanır. `demo_klon_log` ve vector-infra tabloları FK'sız oldukları için kapanışa doğal olarak girmez.
+**Ters kapanış (referencing closure):** `prod_fdw`'de karşılığı olmayan ama set tablolarına FK ile referans veren demo-lokal tablolar klon setinde değildir ama set'i `TRUNCATE` etmeyi bloklar (Postgres 2BP01: "cannot truncate a table referenced in a foreign key constraint"). `demo_klonla()` bu tabloları recursive CTE ile (transitif) yakalar, TRUNCATE listesine katar ve **boşaltır ama prod'dan kopyalamaz** — içerik demo-lokaldir ve prod klonuna girmez. 2026-11-05 köprü yenilemesinden sonra bu durumda tablo yoktur (`ekstra_bosalan` `[]`); `pedigree_nodes`, `pedigree_parentage`, `pg_application_event`, `semen_catalog`, `gorev_ertele_kural` ve `hayvan_takip` artık prod'dan kopyalanır. `TRUNCATE ... CASCADE` bilinçli olarak KULLANILMAZ: kapsam açık hesaplanır ve dönüşte `ekstra_bosalan` olarak loglanır. `demo_klon_log` ve vector-infra tabloları FK'sız oldukları için kapanışa doğal olarak girmez.
 
-Çağrı: `SELECT public.demo_klonla();` → 42 tablo + 4 ekstra-boşalan / ~13k satır / ~2 sn. `GRANT EXECUTE ... TO authenticated`.
+Çağrı: `SELECT public.demo_klonla();` → 49 tablo, `ekstra_bosalan` `[]` / ~17k satır / ~3 sn (ROLLBACK'li ölçüm, 2026-11-05). `GRANT EXECUTE ... TO authenticated`.
 
 ## Kapsam
 
-- **Klonlanan:** tüm egesut/çiftlik tabloları (44).
-- **Hariç:** `agent_*` (gerçek kullanıcı AI-sohbeti — gizlilik), `demo_klon_log` (audit), 3 AI-infra vector tablosu (demo'da yok).
+- **Klonlanan:** `prod_fdw`'de karşılığı olan tüm egesut/çiftlik tabloları (49, 2026-11-05).
+- **Hariç:** `agent_*` (gerçek kullanıcı AI-sohbeti — gizlilik), `demo_klon_log` (audit), 3 AI-infra vector tablosu (demo'da yok), `degisim_log` ve 4 `stat_*` tablosu (köprüde yok: `id` `GENERATED ALWAYS` klonu düşürür, `stat_kayitli_grafik` demo grafiklerini korur; demodaki satırları klonda korunur).
+- **Köprü yenileme:** prod'a tablo ya da kolon ekleyen her migration'dan sonra `01_fdw_bridge.sql`'deki `EXCEPT` listesiyle `IMPORT FOREIGN SCHEMA` yenilenir; önce ROLLBACK'li `demo_klonla()` provası, `demo_sema_diff()` `{}` olmalı.
 
 ## Sıradaki (kararlar 2026-07-02)
 

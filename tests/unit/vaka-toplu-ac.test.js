@@ -107,6 +107,13 @@ const UI_TAKVIM_FN = ['tekTarihTakvimAc', 'tekTarihTakvimKapat', 'tekTarihTakvim
   // R1 revizyon B1b: Uygula önü maske kapısı (bcTakvimGirisUygula çağırır)
   'tarihSeciciMaskeHatasiAl'];
 
+// U2-S1: saat alanı yardımcıları gerçek helpers.js'ten gelir.
+function saatYardimcilari(document) {
+  const { sandbox: h } = loadBrowserModule('js/utils/helpers.js', { dom: document, extra: { HIZLI_SAATLER: ['08:00', '16:00', '20:00'] } });
+  h.toast = () => {};
+  return { saatAlaniHtml: h.saatAlaniHtml, saatYaz: h.saatYaz, saatYarimMi: h.saatYarimMi };
+}
+
 function setupForms() {
   const document = makeDomStub();
   const toasts = [];
@@ -159,6 +166,7 @@ function setupForms() {
       ...ortak,
       ...tarihExtras,
       ...uiTakvim,
+      ...saatYardimcilari(document),
       db: { rpc: async () => ({ data: null, error: null }), from: () => { throw new Error('test stub'); } },
       // js/utils/helpers.js:15-17 birebir — takvim yolları dFwd kullanır
       // (bugun/toast/esc/escAttr ortak setinden gelir)
@@ -359,6 +367,7 @@ function setupFormsPlan() {
   const { sandbox } = loadBrowserModule('js/forms.js', {
     dom: document,
     extra: {
+      ...saatYardimcilari(document),
       db: { rpc: async () => ({ data: null, error: null }), from: () => { throw new Error('test stub'); } },
       g: (id) => document.getElementById(id),
       v: (id) => { const el = document.getElementById(id); return (el && el.value) || ''; },
@@ -2164,7 +2173,7 @@ describe('bcSablonTohumPayload (şablona tohumlama payload haritası)', () => {
 describe('bcSablonKaydet tohumlama kapısı (W19 — yalnız checkbox)', () => {
   // bcSablonKaydet'i RPC yakalayarak sürer: _drugsCache'li taze sandbox
   // (setupFormsPlan) + mini-form DOM'u + geçerli tek-günlük plan state'i.
-  async function kaydetVeYakala({ checked, hayvanlar }) {
+  async function kaydetVeYakala({ checked, hayvanlar, yarimSaat = false }) {
     const { sandbox, document } = setupFormsPlan();
     document.__setEl('bc-disease-id', makeElement('input')).value = 'dis-1';
     document.__setEl('bc-sablon-kaydet-ad', makeElement('input')).value = 'E2E Yükle Turu — tohumlamalı';
@@ -2172,7 +2181,9 @@ describe('bcSablonKaydet tohumlama kapısı (W19 — yalnız checkbox)', () => {
     chk.type = 'checkbox';
     chk.checked = !!checked;
     document.__setEl('bc-tohum-gun', makeElement('input')).value = '2';
-    document.__setEl('bc-tohum-saat', makeElement('input')).value = '16:00';
+    const saatEl = document.__setEl('bc-tohum-saat', makeElement('input'));
+    saatEl.value = yarimSaat ? '' : '16:00';
+    saatEl.validity = { badInput: yarimSaat };
     sandbox.globalThis._bcHayvanlar = hayvanlar; // [] → blok disabled-bos; kapı burada OLMAMALI
     sandbox.globalThis._bcGunler = [{ gun: 1, seanslar: [seans('08:00', {
       D1: { name: 'Baytril 10%', dose: '5', unit: 'ml', route: '' },
@@ -2182,6 +2193,13 @@ describe('bcSablonKaydet tohumlama kapısı (W19 — yalnız checkbox)', () => {
     await sandbox.bcSablonKaydet();
     return cagrilar;
   }
+
+  it('U2-S1: kutu işaretli + yarım saat → şablon yazılmaz; kutu kapalıysa saat okunmaz', async () => {
+    const yarim = await kaydetVeYakala({ checked: true, hayvanlar: [], yarimSaat: true });
+    assert.strictEqual(yarim.length, 0, 'yarım saatle RPC yok');
+    const kapali = await kaydetVeYakala({ checked: false, hayvanlar: [], yarimSaat: true });
+    assert.ok(kapali.find(c => c.name === 'tedavi_sablon_kaydet'), 'kapalı kutuda saat engel değil');
+  });
 
   it('checkbox İŞARETLİ + hayvan listesi BOŞ → tohumlama_plani payload\'a DAHİL (gün 2, 16:00)', async () => {
     const cagrilar = await kaydetVeYakala({ checked: true, hayvanlar: [] });

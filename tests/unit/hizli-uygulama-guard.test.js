@@ -44,6 +44,9 @@ function loadScene({ rpcImpl = null } = {}) {
       idbGetAll: async () => [],
     },
   });
+  const saatH = loadBrowserModule('js/utils/helpers.js', { dom: document }).sandbox; // U2-S1: gerçek saatYarimMi
+  saatH.toast = sandbox.toast;
+  sandbox.saatYarimMi = saatH.saatYarimMi;
   sandbox._islemSonrasiRefresh = async () => { rec.refresh.push(1); };
   sandbox.openDet = (...a) => { rec.openDet.push(a); };
   sandbox.closeM = (...a) => { rec.closeM.push(a); };
@@ -53,6 +56,20 @@ function loadScene({ rpcImpl = null } = {}) {
   sandbox.window.__protokolUyarilar = [];
   return { sandbox, document, btn, rec };
 }
+
+test('U2-S1 #14: yarım pu-saat göndermez, düğme kilitlenmez; geçerliyse gider', async () => {
+  const { sandbox, document, btn, rec } = loadScene();
+  const saat = makeElement('input');
+  saat.validity = { badInput: true };
+  document.__setEl('pu-saat', saat);
+  await sandbox._protokolUygulaKaydet('H-1', 0);
+  assert.strictEqual(rec.rpcs.length, 0);
+  assert.strictEqual(btn.disabled, false, 'kullanıcı düzeltip yeniden gönderebilir');
+  assert.match(rec.toasts[0][0], /Saat/);
+  saat.validity = { badInput: false };
+  await sandbox._protokolUygulaKaydet('H-1', 0);
+  assert.strictEqual(rec.rpcs.length, 1);
+});
 
 test('guard-01: rpc uçuşta iken ikinci çağrı yok sayılır (tek rpc)', async () => {
   let bırak;

@@ -224,6 +224,19 @@ registerActions({
   'close-case-det':  () => closeM('m-case-det'),
   'close-toh-det':   () => closeM('m-toh-det'),
   'close-not':       () => closeM('m-not'),
+  // Hayvan Takip pencereleri (js/hayvan-takip-pencere.js)
+  'ht-ac-gonder':    (el) => htAcGonder(el),
+  'ht-ac-iptal':     () => closeM('m-ht-ac'),
+  'ht-mu-gonder':    (el) => htMuayeneGonder(el),
+  'ht-mu-iptal':     () => closeM('m-ht-muayene'),
+  'ht-ka-gonder':    (el) => htKapatGonder(el),
+  'ht-ka-iptal':     () => closeM('m-ht-kapat'),
+  'ht-tumunu-sec':   () => htTumunuSec(),
+  'ht-acik-kalsin':  () => htAcikKalsin(),
+  'ht-so-gonder':    (el) => htSonucGonder(el),
+  'ht-so-iptal':     () => closeM('m-ht-sonuc'),
+  'ht-so-vaka-ac':   () => htSonucVakaAc(),
+  'ht-so-vaka-bagla': (el) => htVakaBagla(el),
   'close-cikis':     () => closeM('m-cikis'),
   'close-gebelik':   () => closeM('m-gebelik'),
   'close-confirm':   () => closeM('m-confirm'),
@@ -285,7 +298,7 @@ registerActions({
   'bc-chip-sil':      (el) => bcChipCikar(el.dataset.id),
   'bc-tarih-degisti': () => { bcTarihIpucuGuncelle(); bcPlanRender(); }, // V1.2 ipucu + V2.1 başlık tarihleri (Gün N = tarih+N−1)
   'bc-tarih-takvim':  () => bcTarihSeciciAc(), // V2.3-W20 → F3 — 📅 tek-seçim takvim artık kanonik bileşende (tekTarihTakvimAc)
-  'bc-tohum-saat-chip': (el) => { const i = g('bc-tohum-saat'); if (i) i.value = el.dataset.t; }, // V1.2 — hızlı saat çipi
+  'saat-chip':        (el) => saatCipSec(el),                                  // standart saat alanı çipi
   // V2.1 — gün kartları + seans-grup dili
   'bc-gun-ekle-menu': () => bcGunEkleMenuToggle(),                             // [+ Gün ▾] menüsü
   'bc-gun-ekle-bos':  () => { bcGunEkleMenuKapat(); bcGunEkleBos(); },         // ＋ Boş gün (sıradaki №)
@@ -311,7 +324,6 @@ registerActions({
   'bc-seans-vazgec':  () => bcSeansVazgec(),
   'bc-seans-sil':     (el) => bcSeansSil(Number(el.dataset.gun), Number(el.dataset.si)),
   'bc-kalem-sil':     (el) => bcKalemSil(Number(el.dataset.gun), Number(el.dataset.si), el.dataset.id),
-  'bc-saat-chip':     (el) => bcSeansSaatChip(el.dataset.t, el),               // HIZLI_SAATLER çipi (seans formu)
   // V2.2.2 (W16) — 💾 planı şablon olarak kaydet (satır-içi mini-form;
   // kayıt sonrası modal + plan açık kalır — devam düzenleme)
   'bc-sablon-kaydet-toggle': () => bcSablonKaydetToggle(),
@@ -384,7 +396,6 @@ registerActions({
   'sablon-seans-sil':    (el) => sablonSeansSil(el.dataset.gi, el.dataset.ki),
   'sablon-seans-ekle':   (el) => sablonSeansEkle(el.dataset.gi),
   'sablon-seans-vazgec': () => sablonSeansVazgec(),
-  'sablon-saat-chip':    (el) => sablonSaatChip(el.dataset.t),
   'sablon-tohumlama-gun-ekle': (el) => sablonTohumlamaGunEkle(el.dataset.gi),
   'sablon-tohumlama-sil':      () => sablonTohumlamaSil(),
   'sablon-tohumlama-saat':   (el) => sablonTohumlamaSaat(el.value),
