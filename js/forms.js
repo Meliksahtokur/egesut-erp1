@@ -831,7 +831,7 @@ async function submitCase(btn) {
       } catch(e) {
         // Madde 2: PG reddinde return YOK — kapı ekranı açıldıysa akış kapanışa düşer.
         if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri, () => _vakaSablonOnaySonu(res.case_id, sablonId, r))) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
-        else window.__pgKapiVazgec = _vakaPlanUygulanmadi;
+        else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res.case_id, sablonId, x => { r = x; }); }
       }
     } else {
       toast('✅ Vaka açıldı');
@@ -886,7 +886,7 @@ async function submitCase(btn) {
         } catch (e3) {
           // Madde 2: PG reddinde return YOK — akış kapanışa düşer.
           if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri, () => _vakaSablonOnaySonu(res2.case_id, sablonId2, r2))) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
-          else window.__pgKapiVazgec = _vakaPlanUygulanmadi;
+          else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res2.case_id, sablonId2, x => { r2 = x; }); }
         }
         globalThis._seciliSablonId = null;
       } else {
@@ -934,6 +934,16 @@ async function _vakaSablonOnaySonu(caseId, sablonId, r) {
   await _vakaTazele(() => renderCaseTimeline(caseId));
   // Ayrı adım: close_case gün denetlemez, bayat düğme açık günlü vakayı kapattırır (emsal caseSablonUygula).
   await _vakaTazele(() => _updateKapatBtn(caseId));
+}
+
+/**
+ * §18.8 şablonlu vaka kapısı (sahip 2026-11-05): "Boş ata ve uygula" tohumlamayı Boş atar ve seçilen planı
+ * tek işlemde yazar; dönen plan sonucu `yaz` ile onay sonu kapanışına (_vakaSablonOnaySonu) gider.
+ * @rpc tedavi_sablon_bos_ata_uygula
+ */
+function _vakaBosAtaKanca(caseId, sablonId, yaz) {
+  return async (tohumlamaId, gerekce) => yaz(await rpc('tedavi_sablon_bos_ata_uygula',
+    { p_case_id: caseId, p_sablon_id: sablonId, p_tohumlama_id: tohumlamaId, p_gerekce: gerekce }));
 }
 
 /** PG kapısı onaysız kapandı (_pgKapiKapat): vaka durur, plan yazılmadı. */

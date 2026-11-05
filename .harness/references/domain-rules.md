@@ -481,6 +481,13 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
 8. **PG onay kapısı:** sunucu `PG_KAPI:*` RAISE ettiğinde HER UI giriş noktası `_pgKapiHata` zinciriyle
    onay penceresi (`#pg-kapi-bs`: Boş ata ve uygula / Vazgeç) açar; düz "Hata" toast'ı YASAK.
    Yeni bir PG giriş noktası eklenirse aynı sarmal zorunludur.
+   **Şablonlu vaka (sahip 2026-11-05, birebir: "boş ata ve uygula çıkması gerekiyor zaten plan yazıldıktan sonra veya
+   yazılmadan önce yani yazılma aşamasında bu uyarunun döndürülmesi gerekiyor"):** Vaka Aç'ta seçilen şablonun planı
+   kapıya takılırsa aynı pencere çıkar. `Boş ata ve uygula` tohumlamayı Boş atar ve **seçilen planı yazar**, tek işlemde
+   (`tedavi_sablon_bos_ata_uygula`, `20261031200007`). Kapı PG uygulamaz; plandaki PG tek PG'dir, gününde uygulanır.
+   Boş ataması `OVSYNC_BASLAT` açmaz. Ret (`PG_KAPI_BOS_ATA:*`) hiçbir şey yazmaz, pencere açık kalır, tekrar denenir.
+   Vazgeç: plan yazılmaz, vaka kayıtlı kalır ("Vaka kayıtlı, tedavi planı uygulanmadı"). Gebe olabilecek hayvana Boş
+   atamasız PG yolu açılmaz (`Onayla ve uygula` bu kapıda yok). Şablon dışı giriş noktalarının davranışı aynıdır.
 9. **Protokol iptal (`protokol_iptal`):** vaka `IPTAL` ile kapanır, açık gün/seans kapanır, stok iade
    edilir; yeniden başlat görevi istenirse kural günü doğar (kural gelmeden görev satırı yok).
 10. **Erteleme:** ertelenebilir görev tipleri `gorev_ertele_kural` tablosundan okunur — JS'e tip listesi

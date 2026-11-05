@@ -24,6 +24,7 @@ write_manifest:
   - supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql
   - supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql
   - supabase/migrations/20261031200006_hayvan_takip_kilit.sql
+  - supabase/migrations/20261031200007_vaka_sablon_pg_kapi.sql
   - .harness/runbooks/db-migration.md
   - demo/01_fdw_bridge.sql
   - tests/db-validation/hayvan_takip_priors.sql
@@ -139,6 +140,7 @@ checkpoint:
   - U2-K: `tests/unit/hayvan-takip-belge.test.js` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-düzeltme: `tests/sql/hayvan_takip_kilit_test.sh` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-düzeltme 2: `supabase/migrations/20261031200006_hayvan_takip_kilit.sql`, `tests/db-validation/hayvan_takip_kilit_priors.sql`, `.harness/runbooks/db-migration.md` (diğer dosyalar yukarıdaki düğümlerde)
+  - U2-PG (sahip 2026-11-05, §18.8 şablonlu vaka): `supabase/migrations/20261031200007_vaka_sablon_pg_kapi.sql`, `tests/sql/vaka_sablon_pg_kapi_test.sql`, `tests/sql/hayvan_takip_kos.sh` (diğer dosyalar yukarıdaki düğümlerde)
   - Sonradan eklenen, dalda zaten değişen: `demo/01_fdw_bridge.sql` (demo klon koltuğu), `tests/unit/ileri-gebe-duve-siralama.test.js`, `tests/unit/ovsync-girisler.test.js`, `tests/unit/ovsync-pg-ui.test.js`
   - Plan ve kapanış: `docs/plans/2026-10-31-hayvan-takip-PLAN.md`, bu goal dosyası, `.harness/reports/2026-10-31-hayvan-takip.md`
   - Yerel: `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`
@@ -149,9 +151,9 @@ checkpoint:
 - **pattern_refs:** `RPC-WRITE-01`, `MODAL-ROUTER-01`, `FORM-SUBMIT-01`, `TESTING-01`
 - **pattern_exceptions:** `OFFLINE-SYNC-01` uygulanmaz: spec §1 ve §6 çevrimdışı kuyruğu kapsam dışı tutar, yeni RPC'ler online-only kalır.
 - **acceptance commands:**
-  - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`. `200006` için `200005`'ten sonra `tests/db-validation/hayvan_takip_kilit_priors.sql` de verilir.
+  - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`. `200006` için `200005`'ten sonra `tests/db-validation/hayvan_takip_kilit_priors.sql` de verilir; `200007` için priors `200006`'ya kadar aynı dizi.
   - Apply sırası altı dosya, tek işlem: `.harness/runbooks/db-migration.md` "Series apply order".
-  - `bash tests/sql/hayvan_takip_kos.sh` rc=0 (argümansız: seri migration'lar + `hayvan_takip_test.sql`).
+  - `bash tests/sql/hayvan_takip_kos.sh` rc=0 (argümansız: seri migration'lar 200001-7 + `hayvan_takip_test.sql` + `vaka_sablon_pg_kapi_test.sql`).
   - `bash tests/sql/hayvan_takip_kilit_test.sh` rc=0 (kabul DB kopyasında iki oturum: K0-K7).
   - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, `OZET: 11 PASS`; migration'sız (T1 Run) `KOS_MOD=topla` mutant `DUSEN` tam olarak `KR01-KR07`, `KR09`.
   - `node --test tests/unit/*.test.js` (`NODE_PATH` ana checkout): yalnız M0'da ölçülen taban kırmızıları (db46032: 1598/1592/5/1).

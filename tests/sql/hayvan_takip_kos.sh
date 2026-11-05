@@ -3,7 +3,7 @@
 #   [BOLUM=sema|rpc|guard] bash tests/sql/hayvan_takip_kos.sh <sql...>     rc = psql'in
 #   KOS_MOD=topla ...  düşenleri toplar: sonda "DUSEN: KR.. KR.." (sıralı);
 #                      etiketsiz ERROR (mutant ya da betik hatası) rc=2.
-#   Argümansız: seri migration'ları + hayvan_takip_test.sql (kabul paketi).
+#   Argümansız: seri migration'ları (200001-7) + hayvan_takip_test.sql + vaka_sablon_pg_kapi_test.sql (kabul paketi).
 # OZET, "<id> PASS" NOTICE satırlarından sayılır; geri sarılan sayaç kullanılmaz.
 set -u
 if [ "$#" -eq 0 ]; then
@@ -12,7 +12,8 @@ if [ "$#" -eq 0 ]; then
   set -- "$m/20261031200001_hayvan_takip_sema.sql" "$m/20261031200002_hayvan_takip_rpc.sql" \
     "$m/20261031200003_gorev_tamamla_hayvan_takip.sql" "$m/20261031200004_hayvan_takip_halsizlik_etiket.sql" \
     "$m/20261031200005_hayvan_takip_muayene_vaka.sql" "$m/20261031200006_hayvan_takip_kilit.sql" \
-    "$kok/tests/sql/hayvan_takip_test.sql"
+    "$m/20261031200007_vaka_sablon_pg_kapi.sql" \
+    "$kok/tests/sql/hayvan_takip_test.sql" "$kok/tests/sql/vaka_sablon_pg_kapi_test.sql"
 fi
 
 if [ "${KOS_MOD:-}" = topla ]; then

@@ -2975,6 +2975,7 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene, sonraOrRpcAd, rpcAd){
   window.__pgKapiToh = detay.tohumlama_id || null;
   window.__pgKapiRpcAd = ad || null;
   window.__pgKapiSonra = sonra || null;
+  window.__pgKapiBosAta = null; // şablon kancası çağıran tarafından kapı açıldıktan sonra verilir (submitCase)
 }
 /**
  * PG_KAPI hata mesajını analiz eder, hata kodunu ve detayını ayırarak ilgili fonksiyonu çağırır.
@@ -2999,7 +3000,7 @@ function _pgKapiKapat(){
   const box = document.getElementById('pg-kapi-bs');
   if (box) box.remove();
   window.__pgKapiTekrar = null; window.__pgKapiToh = null; window.__pgKapiRpcAd = null;
-  window.__pgKapiSonra = null;
+  window.__pgKapiSonra = null; window.__pgKapiBosAta = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
   // Çağıranın onaysız kapanış kancası (submitCase): onaylı başarı önce siler, tek sefer koşar.
   const vazgec = window.__pgKapiVazgec; window.__pgKapiVazgec = null;
@@ -3076,6 +3077,22 @@ async function _pgKapiBosAtaUygula(){
   const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
   if (!gerekce || !window.__pgKapiToh) return;
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  // §18.8 şablonlu vaka (sahip 2026-11-05): çağıran kancası Boş + seçilen planı TEK işlemde yazar
+  // (tedavi_sablon_bos_ata_uygula); kapı PG uygulamaz, plandaki PG tek PG'dir. Ret: kapı açık, tekrar denenir.
+  const kanca = window.__pgKapiBosAta, sonra = window.__pgKapiSonra;
+  if (typeof kanca === 'function') {
+    try { await kanca(window.__pgKapiToh, gerekce); } catch (e) {
+      toast('❌ Boş atanmadı, plan yazılmadı: ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : e?.message || e), true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+      return;
+    }
+    window.__pgKapiVazgec = null;
+    _pgKapiKapat();
+    toast('✅ Tohumlama Boş atandı, tedavi planı yazıldı');
+    await pullTables(['tohumlama', 'hayvanlar']).catch(() => {});
+    if (typeof sonra === 'function') await sonra();
+    return;
+  }
   try {
     let urun = null, doz = null;
     try {
