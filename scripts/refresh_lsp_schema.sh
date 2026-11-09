@@ -31,6 +31,12 @@ fi
 : "${SB_PROJECT_REF:=zqnexqbdfvbhlxzelzju}"
 : "${LOCAL_LSP_URL:?LOCAL_LSP_URL missing — .env'i kontrol et}"
 
+# Ayna kilidi (db-dry-run.sh ile ortak); dry-run kilidi tutarken çağırırsa atlanır.
+if [[ -z "${EGESUT_AYNA_KILITLI:-}" ]]; then
+  exec 9>"$HOME/.cache/egesut-lsp-ayna.lock"
+  flock -w 600 9 || { echo "❌ Ayna kilidi 600 sn'de alınamadı (fail-closed)." >&2; exit 67; }
+fi
+
 # F8 (root-gate): sabit geçici kök fallback'i YOK — disk-tabanlı kök zorunlu.
 TMP_ROOT="${SS_TMP_ROOT:-${TMPDIR:-}}"
 if [[ -z "$TMP_ROOT" ]]; then
@@ -123,7 +129,7 @@ APP_SCHEMAS="surum_gizli"
 SCHEMA_LIST_SQL="'"$(echo "$APP_SCHEMAS" | tr ' ' ',' | sed "s/,/','/g")"'"
 say "3b/7 Uygulama şemaları üretiliyor ($APP_SCHEMAS)…"
 APP_SCHEMA_DDL=$(mgt_query "
-  SELECT string_agg('CREATE SCHEMA IF NOT EXISTS '||quote_ident(nspname)||';', E'\n')
+  SELECT string_agg('DROP SCHEMA IF EXISTS '||quote_ident(nspname)||' CASCADE; CREATE SCHEMA '||quote_ident(nspname)||';', E'\n')
   FROM pg_namespace WHERE nspname IN ($SCHEMA_LIST_SQL)" | jq -r '.[0].string_agg // ""')
 APP_TABLES_DDL=$(mgt_query "
   SELECT string_agg(stmt, E'\n')
@@ -172,7 +178,11 @@ for ((i=0; i<FN_COUNT; i+=PART_SIZE)); do
   PART=$(( i / PART_SIZE ))
   PART_FILE="$PARTS_DIR/fn_part_${PART}.sql"
   # Her fonksiyonun sonuna ';' ekle (pg_get_functiondef koymuyor, psql parser kırılıyor)
-  echo "$FN_JSON" | jq -r ".[${i}:${i}+${PART_SIZE}] | .[] | . + \"\n;\"" > "$PART_FILE"
+  # check_function_bodies=off (pg_dump ile aynı): LANGUAGE sql gövdeleri
+  # oluşturmada doğrulanır; sonra yüklenen view'a/fonksiyona ileri referans
+  # (v_stat_saglik_vaka, _ovsync_tren_aktif) parçayı ON_ERROR_STOP'ta düşürüyordu.
+  { echo "SET check_function_bodies = off;"
+    echo "$FN_JSON" | jq -r ".[${i}:${i}+${PART_SIZE}] | .[] | . + \"\n;\""; } > "$PART_FILE"
   ACTUAL=$(grep -c '^CREATE OR REPLACE FUNCTION\|^CREATE FUNCTION' "$PART_FILE" || echo 0)
   echo "  Part $PART: $(wc -c <"$PART_FILE") byte, ~$ACTUAL fn"
 done
