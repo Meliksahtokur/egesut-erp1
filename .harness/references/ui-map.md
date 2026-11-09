@@ -106,7 +106,7 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
   Sessiz boş YASAK (okunamayan alan "bilinmiyor").
 - **Render (P6):** `js/ui.js:renderOvsyncSayfa` ailesi — `js/ui.js:_ovsyncKpaHtml` (KPA şeridi +
   "(N takipte)" alt metni), `js/ui.js:_ovsyncBolumHtml` (S0-S4; S0 boşsa gizli, S3 ilk 5 +
-  "tümü (M)", S4 katlanır, dalga grup başlığı, sapma/deneme/takipte/muayene/sonlanma rozetleri,
+  "tümü (M)", S4 katlanır, dalga grup başlığı (bayrak açıkken yerine tren başlığı, bkz. "Ovsync treni"), sapma/deneme/takipte/muayene/sonlanma rozetleri,
   gün renkleri `ovs-g-*`), `js/ui.js:_ovsyncBaslatKilitHtml` (K4 pencere:
   "📅 N gün sonra başlatılabilir" — ▶ Başlat çizilmez), `js/ui.js:_ovsyncMuayeneHtml`,
   `js/ui.js:_ovsyncMuayeneSatirAc` (S2 satır aksiyonu: görevli → `_muayeneSonucAc`, görevsiz →
@@ -174,6 +174,40 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
   ui.js'ten senkron). Üreme geçmişinde düzeltilmiş tohumlama iki satır: `js/ui.js:_uremeTohumlama`
   + `js/ui.js:_tohumlamaGecmisSatirlari` (üstü çizili Boş + Gebe, göreli günler satırın KENDİ
   tarihinden).
+
+## Ovsync treni (domain-rules §18.19; `js/ovsync-tren.js` saf modül, `index.html` içinde `<script src="js/ovsync-tren.js?v=20261110-2">`)
+
+Bayrak `ovsync_tren_aktif` kapalıyken hiçbir yüzey değişmez (eski "Dalga" başlığı, eski Başlat/Ertele yolları, ek RPC YOK). Bütün tren
+yazmaları `js/api.js:apiOvsyncTren` (çevrimdışı → "İnternet yok", kuyruk YOK; yazma sonrası `_ovsyncTakipInvalidate`); okuma/yazma çağrıları
+ui.js'te `js/ui.js:_ovsyncTrenCagir`. RPC sözleşmesi `rpc-reference.md` "Ovsync Treni". Çevrimdışıyken tren düğmeleri çizilmez. Vurgu yalnız
+yazı rengi (`.ovs-tren-*`, `index.html` `<style>`; zemin/şerit yok, ui-renk-minimal). Tek tıklama dinleyicisi `js/ui.js:_ovsyncTrenAksiyonTikla`
+(`data-ovt-aksiyon`: TOPTAN · ONAYLA · ERTELE · SONRAKI_TREN · PG48 · BASTAN · DUZENLE · AYAR/AYAR_ACIK/AYAR_KAPALI/AYAR_TAKVIM/AYAR_ONIZLE/AYAR_KAYDET · VAZGEC;
+inline onclick YOK); modallar non-router bottom-sheet (`js/ui.js:_ovsyncModalYaz`/`_ovsyncModalKapat`).
+
+| Yüzey | Fonksiyon (dosya:sembol) | RPC |
+|---|---|---|
+| Veri çekimi (takip + tren paralel, hata/offline → eski render) | `js/ui.js:loadOvsyncDash` → `js/ui.js:renderOvsyncSayfa` (3. argüman `trenVeri`), `js/ui.js:_ovsyncTrenSayfaAcik` | `ovsync_tren_listele` |
+| Tren başlığı "Tren · Per 19 Kas · 4 hayvan · bugün: PG günü" + üye kartı (S0∪S1 gruplanır) | `js/ui.js:_ovsyncTrenGovdeHtml`, `js/ui.js:_ovsyncTrenSatirHtml`, `js/ovsync-tren.js:ovsyncTrenGrupla`, `js/ovsync-tren.js:ovsyncTrenBaslikHtml` | — |
+| "Tren gününü ertele…" (YALNIZ ilk tren başlığında, RL-16; ritim dışı başlıkta yok) | `js/ovsync-tren.js:ovsyncIlkToptanTarih`, `js/ovsync-tren.js:ovsyncToptanTarih` | — |
+| Aşama aksiyonları (0 "Sonraki trene aktar", 1 "PG'yi ertele · en çok +pg_pay", 2 "PG1 + 48 s'te tohumla" / "Baştan başlat", belirsiz yalnız "Baştan başlat") | `js/ovsync-tren.js:ovsyncAsamaAksiyonHtml`, `js/ovsync-tren.js:ovsyncTekErteleAraligi`, `js/ui.js:_ovsyncPg48SatirHtml`, `js/ui.js:ovsyncErteleOnayla`, `js/ui.js:ovsyncSonrakiTren`, `js/ui.js:ovsyncPg48`, `js/ui.js:_ovsyncBastanBaslatAkisi` | `ovsync_hayvan_ertele`, `ovsync_pg48_tohumla`, `ovsync_bastan_baslat` |
+| Bağımsızlar bloğu + "Dokunulmaz: b bağımsız · r ritim dışı" | `js/ui.js:_ovsyncBagimsizAltSatirHtml`, `js/ovsync-tren.js:ovsyncTrenBaslikHtml` (ritim dışı notu `ritim_disi_neden`) | `ovsync_tren_listele` |
+| Toptan erteleme modalı (N 1..7 çipi → önizleme → SECIM PG48/BASTAN → tek onay; seçim eksikken Onayla pasif; `OVSYNC_TREN_ERTELE_DUSTU` modal açık kalır) | `js/ui.js:ovsyncToptanAc`, `js/ui.js:ovsyncToptanN`, `js/ui.js:ovsyncToptanSecim`, `js/ui.js:ovsyncToptanOnayla`, `js/ui.js:_ovsyncToptanGovdeHtml`, `js/ovsync-tren.js:ovsyncToptanOnizlemeHtml`, `js/ovsync-tren.js:ovsyncToptanOnayAcikMi`, sonuç metni `js/forms.js:_ovsyncToptanSonucMetni` | `ovsync_tren_ertele_onizle`, `ovsync_tren_ertele` |
+| Tren ayarı paneli (aktif anahtarı + çapa takvimi → Önizle kuru → Kaydet; belirsiz aşama listesi) | `js/ui.js:_ovsyncAyarSatirHtml` ("Tren ayarı ›"), `js/ui.js:ovsyncAyarAc`, `js/ui.js:ovsyncAyarOnizle`, `js/ui.js:ovsyncAyarKaydet` | `ovsync_tren_yeniden_hedefle(p_kuru:true)`, `ovsync_tren_ayar_guncelle` |
+| Yazma sonrası tazeleme | `js/ui.js:_ovsyncTrenYenile` | `ovsync_tren_listele` |
+| Hata metni (özyinelemeli; `OVSYNC_TREN_ERTELE_DUSTU.dusenler[].sebep` içindeki ham kod dahil) | `js/ovsync-tren.js:ovsyncTrenHataMetni` | — |
+| **K8 "Trene bin" modalı** ("🚆 Trene bin — <gün> (<n> hayvan)" ön seçili / "Bağımsız başlat — bugün"; tren = bugün → modalsız tek seçenek, R4; çevrimdışı → modal yok) | `js/ovsync-tren.js:ovsyncTrenSor`, `js/ovsync-tren.js:ovsyncTrenSoruGerekli`, `js/ovsync-tren.js:ovsyncTrenSoruHtml`, `js/ovsync-tren.js:ovsyncTrenAktif` | `ovsync_tren_onizle` |
+| K8 giriş V2 (▶ Başlat) | `js/ui.js:ovsyncBaslat` → `js/ui.js:_ovsyncBaslatSecimi` (bağımsız → `p_bagimsiz:true`; `basladi:false` + `yeniden_hedef` → "trenine taşındı, başlamadı") | `start_first_service_protocol` |
+| K8 giriş V3 (Vaka Aç + Ovsync şablonu, create_case ÖNCESİ soru) | `js/forms.js:submitCase` + `js/forms.js:_ovsyncKancaDurumu`, `js/forms.js:_ovsyncKancaSor` | `tedavi_sablon_uygula(p_baslangic_tarihi)` |
+| K8 giriş V4 (Toplu Vaka Aç) | `js/forms.js:submitBulkCase` | `vaka_toplu_ac(p_tarih)` |
+| K8 giriş V5 (Şablon uygula) | `js/ui.js:caseSablonUygula` (erken dal), `js/forms.js:_ovsyncV5KancaKur` | `tedavi_sablon_uygula` |
+| K8 giriş V6 (Boş ata ve uygula) | `js/forms.js:_vakaBosAtaKanca` | `tedavi_sablon_bos_ata_uygula` |
+| K8 giriş G7 (Boş sonrası "Ovsync uygula") | `js/ui.js:_devamSeciciOnayla` + `js/ui.js:_ovsyncG7G9Sor` (bağımsız → `start_first_service_protocol(p_bagimsiz:true)`; hata → toast, throw yok) | `tohumlama_bos_ve_devam`, `start_first_service_protocol` |
+| K8 giriş G9 (`protokol_iptal` yeniden başlat) | `js/ui.js:_protokolIptalAkisi` + `js/ui.js:_ovsyncG7G9Sor` | `ovsync_bastan_baslat` |
+| Görevler ekranı (K10): Ovsync görevinde "Ertele" yerine "Ovsync ekranında düzenle →" (bayrak kapalıyken eski Ertele) | `js/ui.js:_erteleBtnHtml` kancası → `js/ui.js:_ovsyncKartKararBaglami`, `js/ui.js:_ovsyncTrenKartErteleHtml`, `js/ovsync-tren.js:ovsyncTrenGorevMu` (SQL `_ovsync_gorev_mu` ile tek tanım; yalnız `^\s*\{` açıklamalar JSON çözülür), `js/ovsync-tren.js:ovsyncDuzenleLinkHtml`, `js/ovsync-tren.js:ovsyncEkranindaDuzenle` | — |
+| Çoklu kaydırma notu "⏭ N Ovsync görevi atlandı · Ovsync ekranı →" | `js/forms.js:cokluKaydirOnayla` + `js/forms.js:_ovsyncCokluBantEki`, `js/ovsync-tren.js:ovsyncCokluAtlananNot` | `vaka_kalan_gunleri_kaydir_coklu` (`ovsync_atlanan`) |
+| Vaka kartı "Kalan Günleri Kaydır" aşama dalları (0 → Sonraki trene aktar, 1 → +N ≤ pg_pay / yalnız Baştan başlat, 2 → kaydır yok: PG1+48 / Baştan başlat, belirsiz/çevrimdışı → kaydır yok + Ovsync ekranı bağlantısı) | `js/ui.js:cdKaydirAc`, `js/ui.js:_ovsyncKaydirDaliAc`, `js/ui.js:_ovsyncKaydirSheetHtml`, `js/ui.js:_ovsyncKaydirErtele`, `js/ui.js:cdKaydirOvsyncPg48`, `js/ui.js:cdKaydirOvsyncBastan`, `js/ui.js:cdKaydirOvsyncDuzenle` | `ovsync_tren_listele` (aşama), `ovsync_hayvan_ertele`, `ovsync_pg48_tohumla`, `ovsync_bastan_baslat` |
+| K11 geç tamamlama sheet'i (toast korunur; "Baştan başlat → trene bin" / "Devam et") | `js/forms.js:seansTamamla` → `js/forms.js:_ovsyncSeansUyariHtmli`, `js/forms.js:_ovsyncUyariSheetAc`, `js/ovsync-tren.js:ovsyncGecTamamlamaUyariHtml` | `seans_tamamla` (`ovsync_uyari`) |
+| 🔔 doğum PG hatırlatma satırı (2./25. gün; görev değil) + rozet sayısı | `js/ui.js:_showProtokolEkran` (panel, 🌱 İlk Tohumlama yanı) → `js/ovsync-tren.js:dogumPgHatirlatmaHtml`; rozet `js/ui.js:_ovsyncDogumPgSatirlari` + `js/ui.js:_rozetTopla` | `dogum_sonrasi_pg_hatirlatma` |
 
 ## Hayvan Takip (📌; domain-rules §20; `js/hayvan-takip.js` saf, `js/hayvan-takip-pencere.js` pencere)
 

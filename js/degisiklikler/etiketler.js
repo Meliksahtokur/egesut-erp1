@@ -238,6 +238,7 @@ const DG_ALAN_ETIKETLERI = {
   },
   cases: {
     start_date: 'Başlangıç', closed_at: 'Kapanış', plan_notu: 'Plan notu',
+    ovsync_tren: 'Tren üyeliği', ovsync_bagimsiz: 'Bağımsız işareti',
   },
   treatment_days: {
     day_no: 'Gün no', treatment_date: 'Tedavi tarihi', treatment_time: 'Tedavi saati',

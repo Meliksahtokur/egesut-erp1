@@ -1,0 +1,169 @@
+
+Running 20 tests using 1 worker
+
+  ✓   1 [chromium] › tests/e2e/ovsync-takip.spec.js:339:5 › T-56: dashboard 6. hücre "Ovsync" görünür; tıklayınca #pg-ovsync açılır (5.9s)
+  ✓   2 [chromium] › tests/e2e/ovsync-takip.spec.js:350:5 › T-32/T-59: KPA şeridi 5 sayaç; render edilen bölüm başlıkları = dolu bölümler (boş gizli) (6.6s)
+  ✓   3 [chromium] › tests/e2e/ovsync-takip.spec.js:373:5 › T-01/T-07/T-02/T-03: Boş→seçici; Ovsync ön seçili; PG kartı ürün/doz ÖN DOLU; TAKIP +7 gün (17.3s)
+  ✓   4 [chromium] › tests/e2e/ovsync-takip.spec.js:396:5 › T-20: takipli+PG → TAKIP_ACIK onay sheet (#takip-acik-bs); Vazgeç yazma yapmaz (17.5s)
+  ✓   5 [chromium] › tests/e2e/ovsync-takip.spec.js:433:5 › T-38/T-44: S2 "muayene vakti" rozeti (40 g eşik); "21" sabiti yok (6.6s)
+  ✓   6 [chromium] › tests/e2e/ovsync-takip.spec.js:447:5 › T-04/T-05 K15: S2 "muayene vakti" → 🩺 sonuç ekranı; GEBELIK_KONTROL 5 seçim (17.2s)
+  ✓   7 [chromium] › tests/e2e/ovsync-takip.spec.js:471:5 › T-25/T-26: muayeneyi ertele (+7) saatsiz → görev hedef +7, hedef_saat NULL (17.1s)
+  ✓   8 [chromium] › tests/e2e/ovsync-takip.spec.js:495:5 › T-87: TAKIP_MUAYENE ekranı 4 seçim (TAKIP yok); ertelemede "N gündür takipte" onayı (26.2s)
+  ✘   9 [chromium] › tests/e2e/ovsync-takip.spec.js:524:5 › T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHUMLAMA), listeden düşer (26.0s)
+  ✓  10 [chromium] › tests/e2e/ovsync-takip.spec.js:549:5 › T-73/T-89: jenerik gorev_tamamla GEBELIK_KONTROL kapatamaz; kizginlik_vaka_ac TAKIP_ACIK (2 varyant) + onaylı kapanış (9.1s)
+  ✓  11 [chromium] › tests/e2e/ovsync-takip.spec.js:592:5 › T-84/T-85: takipte Gebe → tohumlama Gebe olur; üreme geçmişinde üstü çizili Boş + Gebe + göreli gün (41.2s)
+  ✘  12 [chromium] › tests/e2e/ovsync-takip.spec.js:626:5 › T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur; S3 🔍 takipte (25.4s)
+  ✓  13 [chromium] › tests/e2e/ovsync-takip.spec.js:758:5 › Y-N3: + Hastalık modalı ön-dolu (gün 7, CAROFERTIN-E 20 ml, TAI chip) → Ekle günü açar, TAI +7, iptal yok (24.2s)
+  ✓  14 [chromium] › tests/e2e/ovsync-takip.spec.js:788:5 › Y-N3b: Kistik Over seçiminde ön-öneri boş başlar; Ekle kist gününü açar (27.3s)
+  ✓  15 [chromium] › tests/e2e/ovsync-takip.spec.js:805:5 › Y-N2: vaka detayında tek + Hastalık/+ İlaç çifti; Ekle sonrası timeline hastalık bloğu tazelenir (26.4s)
+  ✓  16 [chromium] › tests/e2e/ovsync-takip.spec.js:833:5 › Y-N1: hayvan kartında girintili hastalık alt-satırı; ayrı hastalık satırı yok (38.6s)
+  ✘  17 [chromium] › tests/e2e/ovsync-takip.spec.js:853:5 › Y-N4: timeline hastalık bloğunda ilaç satırı ve TAI ertele soneki görünür (31.8s)
+  ✓  18 [chromium] › tests/e2e/ovsync-takip.spec.js:867:5 › Y-CIFT-TIK: çift Ekle tek hastalık günü açar; tekrar mevcut döner, ilaç yinelenmez (24.3s)
+  ✘  19 [chromium] › tests/e2e/ovsync-takip.spec.js:903:5 › Y-NULL-PF: ailesi NULL vakada yedek tanımla + Hastalık görünür ve kayıt çalışır (41.5s)
+  ✓  20 [chromium] › tests/e2e/ovsync-takip.spec.js:926:5 › Y-M5M7: günü tamamlanıp kapatılan hastalık-günlü vaka S4 rozeti taşır (47.1s)
+
+
+  1) [chromium] › tests/e2e/ovsync-takip.spec.js:524:5 › T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHUMLAMA), listeden düşer 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-TAKIP-PW-e' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-TAKIP-PW-e' })
+
+
+      525 |   await openApp(page);
+      526 |   await page.evaluate(() => window.goTo && window.goTo('ovsync'));
+    > 527 |   await expect(page.locator('#pg-ovsync .ovs-takip-satir', { hasText: S.e.kupe })).toBeVisible({ timeout: 10000 });
+          |                                                                                    ^
+      528 |   // REST tohumlama — tetikleyici sessiz kapatır (onay/dialog yok; UI hiçbir akışa girmez)
+      529 |   const { error } = await db.from('tohumlama').insert({
+      530 |     hayvan_id: S.e.hayvanId, tarih: trBugun(), sonuc: 'Bekliyor',
+        at /work/tests/e2e/ovsync-takip.spec.js:527:84
+
+    Error Context: ../tmp/pwout/e2e-ovsync-takip-T-19-taki-aa01f-NI-TOHUMLAMA-listeden-düşer-chromium/error-context.md
+
+  2) [chromium] › tests/e2e/ovsync-takip.spec.js:626:5 › T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur; S3 🔍 takipte 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-TAKIP-PW-f' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-TAKIP-PW-f' })
+
+
+      655 |   await page.evaluate(() => window.goTo && window.goTo('ovsync'));
+      656 |   const fSatir = page.locator('#pg-ovsync .ovs-takip-satir', { hasText: S.f.kupe });
+    > 657 |   await expect(fSatir).toBeVisible({ timeout: 10000 });
+          |                        ^
+      658 |   await expect(fSatir).toContainText('🔍 takipte');
+      659 | });
+      660 |
+        at /work/tests/e2e/ovsync-takip.spec.js:657:24
+
+    Error Context: ../tmp/pwout/e2e-ovsync-takip-T-03-T-50-ad3aa-cache-bozulur-S3-🔍-takipte-chromium/error-context.md
+
+  3) [chromium] › tests/e2e/ovsync-takip.spec.js:853:5 › Y-N4: timeline hastalık bloğunda ilaç satırı ve TAI ertele soneki görünür 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('#m-case-det .cd-tl-item').filter({ hasText: 'İnaktif Ovaryum' }).first().locator('.cd-acc-body')
+    Timeout: 5000ms
+    Expected pattern: /CAROFERTIN/i
+    Received string:  "····································
+                      İlaç eklenmemiş
+                      + İlaç ekle14.11 · 5. gün PG (opsiyonel)··································································
+              ✅ Tamamla
+              + İlaç
+              ⏰ Seans Planla
+              📝 Not···········
+                🕐
+                🗑··········································································
+                  "
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for locator('#m-case-det .cd-tl-item').filter({ hasText: 'İnaktif Ovaryum' }).first().locator('.cd-acc-body')
+        9 × locator resolved to <div class="cd-acc-body" id="drugs-e0a3bc70-c1b2-4039-be76-f2c12d72759f">…</div>
+          - unexpected value "
+                    
+                      
+                      İlaç eklenmemiş
+                      + İlaç ekle14.11 · 5. gün PG (opsiyonel)
+                      
+                      
+                      
+            
+              ✅ Tamamla
+              + İlaç
+              ⏰ Seans Planla
+              📝 Not
+              
+                🕐
+                🗑
+              
+            
+            
+            
+                      
+                    
+                  "
+
+
+      860 |   await expect(blok).toBeVisible({ timeout: 20000 });
+      861 |   if (await blok.locator('.cd-acc.open').count() === 0) await blok.locator('.cd-acc-hdr').click();
+    > 862 |   await expect(blok.locator('.cd-acc-body')).toContainText(/CAROFERTIN/i);
+          |                                              ^
+      863 |   await expect(page.locator('#m-case-det')).toContainText(/\(\d{2}\.\d{2} → \d{2}\.\d{2}\)/); // TAI ertele soneki
+      864 | });
+      865 |
+        at /work/tests/e2e/ovsync-takip.spec.js:862:46
+
+    Error Context: ../tmp/pwout/e2e-ovsync-takip-Y-N4-time-c64d5-e-TAI-ertele-soneki-görünür-chromium/error-context.md
+
+  4) [chromium] › tests/e2e/ovsync-takip.spec.js:903:5 › Y-NULL-PF: ailesi NULL vakada yedek tanımla + Hastalık görünür ve kayıt çalışır 
+
+    Error: yedek kabul → + Hastalık görünür
+
+    expect(locator).toBeVisible() failed
+
+    Locator:  locator('#cd-hastalik-btn')
+    Expected: visible
+    Received: hidden
+    Timeout:  10000ms
+
+    Call log:
+      - yedek kabul → + Hastalık görünür with timeout 10000ms
+      - waiting for locator('#cd-hastalik-btn')
+        14 × locator resolved to <button class="btn" id="cd-hastalik-btn">+ Hastalık</button>
+           - unexpected value "hidden"
+
+
+      908 |   await page.evaluate(aid => window.openCaseDet(aid), anaId);
+      909 |   await expect(page.locator('#m-case-det')).toHaveClass(/on/, { timeout: 10000 });
+    > 910 |   await expect(page.locator('#cd-hastalik-btn'), 'yedek kabul → + Hastalık görünür').toBeVisible({ timeout: 10000 });
+          |                                                                                      ^
+      911 |   await page.locator('#cd-hastalik-btn').click();
+      912 |   const modal = page.locator('#hastalik-modal');
+      913 |   await expect(modal).toBeVisible({ timeout: 10000 });
+        at /work/tests/e2e/ovsync-takip.spec.js:910:86
+
+    Error Context: ../tmp/pwout/e2e-ovsync-takip-Y-NULL-PF-82aed-ık-görünür-ve-kayıt-çalışır-chromium/error-context.md
+
+  4 failed
+    [chromium] › tests/e2e/ovsync-takip.spec.js:524:5 › T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHUMLAMA), listeden düşer 
+    [chromium] › tests/e2e/ovsync-takip.spec.js:626:5 › T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur; S3 🔍 takipte 
+    [chromium] › tests/e2e/ovsync-takip.spec.js:853:5 › Y-N4: timeline hastalık bloğunda ilaç satırı ve TAI ertele soneki görünür 
+    [chromium] › tests/e2e/ovsync-takip.spec.js:903:5 › Y-NULL-PF: ailesi NULL vakada yedek tanımla + Hastalık görünür ve kayıt çalışır 
+  16 passed (10.5m)
+RC=1

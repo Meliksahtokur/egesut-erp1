@@ -771,6 +771,100 @@ p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarm
 
 ---
 
+## Ovsync Treni (migrations 20261110100001-000008; domain-rules §18.19; spec `docs/plans/2026-11-09-ovsync-tren/design.md`)
+
+> İmza/dönüş/hata kodları **migration gövdelerinden** yazıldı (dal `ovsync-tren`; kabul DB'sinde ölçüldü, prod apply bekler —
+> canlı şema ayrı yetkili probe ile doğrulanmadan imza kesin sayılmaz). Yol kısaltması: `M1`..`M8` =
+> `supabase/migrations/20261110100001..008_*.sql` (M1 dogum_pg_hatirlatma, M2 cekirdek, M3 gorev_dogumu, M4 baslatma, M5 kilit,
+> M6 asama, M7 toptan, M8 ayar_goc); `dosya:satır` yazım anı satırıdır (±birkaç satır kayabilir). Davranış `ovsync_tren_aktif`
+> (+ `ovsync_pg_kurallari_aktif`) bayrağı arkasındadır. **Ortak:** SECURITY DEFINER, `jsonb` döner; tarihler TR günü ISO
+> `YYYY-MM-DD`; hata `RAISE EXCEPTION 'KOD:{json}'` (`rpc()` `Error` fırlatır, gövde mesajda, JS çözücü `ovsyncTrenHataMetni`);
+> bayrak kapalıyken listele/önizle `{ok:true, aktif:false}`, yazan RPC'ler `OVSYNC_TREN_KAPALI:{rpc,…}`. Yazan RPC'ler `app.ovsync_tren_ic='1'`
+> iç bayrağıyla K10 kilidini geçer ve `pg_advisory_xact_lock(hashtext('ovsync_tren'))` ile seri. ACL: `REVOKE ALL FROM PUBLIC, anon`,
+> `GRANT authenticated, service_role` (kabul DB'sinde anon ölçülemedi — DM1 apply sonrası `has_function_privilege('anon', …)` ölçülmeli).
+> Yazma RPC'leri `RPC_TABLES`'a (js/api.js) girer; salt-okunurlar girmez.
+
+### Yeni RPC'ler (10)
+
+**`ovsync_tren_onizle(p_hayvan_id text DEFAULT NULL)`** (M4:545, STABLE) → K8 modal verisi. Kapalı `{ok,aktif:false}`. Açık `{ok, aktif:true,
+bugun, tren_gunu, tren_bugun_mu, uye_sayisi, gorev:{id,hedef_tarih}|null, gorev_hedef_eski:bool, kupe_no, kural_tarihi, uye_kupeler:[text]}`;
+`kupe_no`/`kural_tarihi` yalnız `p_hayvan_id` verilince. `tren_gunu`: görev hedefi geçmiş/ritim dışıysa R9 formülü
+`_ovsync_tren_gunu_ic(GREATEST(kural,hedef),…)` + `gorev_hedef_eski:true`; görevsiz hayvanda kural yok sayılır (ilk ritim günü ≥ bugün).
+`uye_sayisi`/`uye_kupeler` = tren kümesi, sorulan hayvan HARİÇ. Hata: `OVSYNC_TREN_AYAR`. Yazmaz.
+
+**`ovsync_tren_listele()`** (M7:65, STABLE) → Ovsync ekranı. Kapalı `{ok,aktif:false,capa:null,bugun,trenler:[],bagimsizlar:[],ileri_sayisi:0}`. Açık
+`{ok, aktif:true, capa, bugun, trenler:[{tren_gunu, ritim_disi, uyeler:[UYE]}], bagimsizlar:[UYE], ileri_sayisi}`; trenler `tren_gunu` artan, bugün+28'e kadar
+(R16), ötesi `ileri_sayisi`; `bagimsizlar` = `ovsync_tren IS NULL` aktif OVSYNC vakalar. `UYE` (vaka) `{hayvan_id, kupe_no, case_id, gorev_id:null,
+asama:0|1|2|null, ovsync_tren, sonraki_is:{tarih,saat,tur:GNRH1|PG1|PG2|GNRH2|TAI}|null, pg_pay (yalnız aşama 1, tolerans−kayma, negatif olabilir),
+pg1_zaman, ritim_disi_neden:'PG +k gün'|'PG -k gün'|'tren ritmi değişti'|null}`; `UYE` (görev) `case_id:null, gorev_id, asama:0, ovsync_tren=hedef`,
+`ritim_disi_neden` `'gecikmiş başlangıç'|'başlangıç ritim dışı'|null`. Hata: `OVSYNC_TREN_AYAR`. Yazmaz.
+
+**`ovsync_tren_ertele_onizle(p_tarih date, p_n integer)`** (M7:249, STABLE; plan `_ovsync_tren_ertele_plan` M7:136) → `{ok:true} ||` plan
+`{tren, yeni_tren(=tren+n), uyeler:[{hayvan_id,kupe_no,case_id|null,gorev_id|null,asama,ovsync_tren,pg_pay,pg1_zaman, sonuc:'KAYAR'|'BASTAN'|'SECIM'|null,
+yeni_tarih|null}], ileri_gorevler:[{gorev_id,hayvan_id,eski,yeni,kural_yok?}], ileri_vakalar:[{case_id,hayvan_id,kupe_no,eski,yeni}], tren_sayisi,
+dokunulmaz:{bagimsiz,ritim_disi}}`. `sonuc`: aşama 0 → `BASTAN` (ovsync_tren < X, RL-17) yoksa `KAYAR`; aşama 1 → `n ≤ pg_pay` ise `KAYAR` yoksa `BASTAN`;
+aşama 2 → `SECIM`; aşama belirsiz → `null`. Hatalar: `OVSYNC_TREN_KAPALI:{rpc,tarih}`, `OVSYNC_TREN_N_GECERSIZ:{gun,min:1,max:7}`, `GECMIS_TARIH:{tarih,bugun}`
+(`OVSYNC_` öneki YOK), `OVSYNC_TREN_GUNU_DEGIL:{tarih,capa}` ya da `{tarih,sebep:'ONCEKI_TREN_VAR',ilk_tren}` (RL-16), `OVSYNC_TREN_BOS:{tarih}`,
+`OVSYNC_TREN_AYAR`. Yazmaz.
+
+**`ovsync_tren_ertele(p_tarih date, p_n integer, p_secimler jsonb DEFAULT '{}')`** (M7:267) → tek işlem (kısmi başarı YOK). `p_secimler = {"<case_id>":"PG48"|"BASTAN"}`.
+Dönüş `{ok, tren, yeni_tren, islenen:[{hayvan_id,kupe_no,case_id,gorev_id,asama,sonuc,islem:'KAYAR'|'BASTAN'|'PG48',yeni_tarih,detay:<alt RPC dönüşü>}],
+ileri_gorevler, ileri_vakalar}`. Hatalar: önizlemedekiler + `OVSYNC_TREN_SECIM_EKSIK:{eksik:[case_id]}` + `OVSYNC_TREN_ERTELE_DUSTU:{tren,n,dusenler:[{hayvan_id,kupe_no,
+case_id?,gorev_id?,sebep:<ham SQLERRM>,oneri?:'BASTAN_BASLAT_YA_DA_SEANS_ISARETLE'}]}` (hepsi geri alınır, çapa dahil). Yazar: `protokol_ayar` (çapa += N, doğrudan),
+`islem_log`; alt RPC'ler üzerinden `gorev_log` (`gorev_ertele`), `cases`/`treatment_days` (`vaka_kalan_gunleri_kaydir`), BASTAN/PG48 dalları aşağıdaki tablolar.
+
+**`ovsync_hayvan_ertele(p_hayvan_id text, p_gun integer)`** (M6:251) → tek hayvan, Ovsync ekranı. `{ok, asama:0|1, sonuc:'SONRAKI_TREN'|'KAYDI', yeni_tarih}`
+(aşama 0 trende `SONRAKI_TREN`, bağımsız aşama 0/aşama 1 `KAYDI`). Hatalar: `OVSYNC_TREN_KAPALI`, `OVSYNC_TREN_N_GECERSIZ:{gun,min,max}`, `OVSYNC_VAKA_YOK:{hayvan_id}`,
+`OVSYNC_ASAMA_BELIRSIZ:{case_id,oneri:'BASTAN_BASLAT'}`, `OVSYNC_ASAMA2_ERTELEME_YOK:{case_id,secenekler:['PG48','BASTAN']}`,
+`OVSYNC_ASAMA1_TOLERANS:{tolerans,mevcut_kayma,istenen,oneri:'BASTAN_BASLAT',case_id}`. Yazar (alt RPC): `gorev_log` (`gorev_ertele`), `treatment_days`/`gorev_log`/`cases.ovsync_tren`
+(`vaka_kalan_gunleri_kaydir`).
+
+**`ovsync_pg48_tohumla(p_case_id uuid)`** (M6:333) → K6(a). `{ok, tai_gorev_id, tai_hedef, kapanan_seans}`. Hatalar: `OVSYNC_TREN_KAPALI`, `OVSYNC_VAKA_YOK:{case_id}`,
+`OVSYNC_ASAMA2_DEGIL:{case_id,asama}`, `OVSYNC_PG48_TAI_YOK:{case_id,hayvan_id}`, `OVSYNC_PG48_GECMIS:{case_id,tai_gorev_id,tai_hedef,tai_saat}`,
+`OVSYNC_PG48_SEANS_KAPANMADI:{case_id,seans_admin_id,sonuc}`. Yazar: kalan açık seansları `seans_tamamla(p_uygulanmadi=>true)` ile kapatır →
+`treatment_day_uygulamalar`, `treatment_days`, `drug_administrations`, `stok_hareket`, `gorev_log`, `islem_log`.
+
+**`ovsync_bastan_baslat(p_case_id uuid, p_bagimsiz boolean DEFAULT false, p_not text DEFAULT NULL, p_hedef date DEFAULT NULL)`** (M6:399; PLAN R11 3 parametreydi,
+4. parametre `p_hedef` D7 tur 2/RL-15 — toptan BASTAN içindir; geçersizse `OVSYNC_BASTAN_HEDEF_GECERSIZ`) → K5/K6(b): `protokol_iptal` + yeniden başlat; hedef = tren günü;
+bağımsız ya da hedef=bugün ise aynı işlemde başlar. Her dalda açık PG+48 TAI kapatılır (RL-12). Dönüş `{ok, kapanan_case_id, yeni_gorev_id, hedef_tarih, basladi,
+yeni_case_id|null, iptal_tai:[uuid]}`. Hatalar: `OVSYNC_TREN_KAPALI`, `OVSYNC_VAKA_YOK`, `OVSYNC_BASTAN_BASLATILAMADI:{case_id,yeniden_not|yeni_gorev_id,…}`,
+`OVSYNC_BASTAN_HEDEF_GECERSIZ:{case_id,hedef,en_erken,bagimsiz}`. Yazar (alt RPC): `protokol_iptal` (vaka/gün/seans kapanışı, stok iadesi), `start_first_service_protocol`,
+`gorev_log` (UPDATE + `gorev_ertele`), `islem_log`.
+
+**`ovsync_tren_yeniden_hedefle(p_kuru boolean DEFAULT true, p_capa date DEFAULT NULL)`** (M8:19) → ayar/göç. `{ok, kuru, capa, gorevler:[{gorev_id,hayvan_id,kupe_no,eski,yeni|null,
+durum:'KURAL_YOK'|'AYNI'|'TASINIR'}], uyelik:[{case_id,hayvan_id,tren}], belirsiz_asama:[{case_id,hayvan_id,kupe_no}], belirsiz_sayisi}` (`belirsiz_asama`/`belirsiz_sayisi`
+= R6-EK, M8:102-103). Kuru bayraktan bağımsız; `p_capa` yalnız kuruda ayardan farklı olabilir, kuru değilken farklıysa `OVSYNC_TREN_AYAR:{…,sebep:'AYARDAN_FARKLI'}`. Hedefi <
+bugün görevler listede yok. Üyelik yazımı `AND NOT ovsync_bagimsiz` (D9). Hatalar: `OVSYNC_TREN_KAPALI` (yalnız kuru değil), `OVSYNC_TREN_AYAR`. Yazar (kuru=false): `gorev_log`
+(`gorev_ertele`), `cases.ovsync_tren`.
+
+**`ovsync_tren_ayar_guncelle(p_aktif boolean, p_capa date)`** (M8:113) → `{ok, aktif, capa|null, yeniden_hedef:<yeniden_hedefle dönüşü>|null}`. Açılışta (0→1) ya da açıkken çapa
+değişince ayar doğrulanır ve aynı işlemde `ovsync_tren_yeniden_hedefle(false)` koşar (R14/RL-18); kapatma ayarı doğrulamaz (hızlı geri). Hata `OVSYNC_TREN_AYAR:{anahtar,deger,
+sebep:'EKSIK'|'ARALIK_DISI'|'TAMSAYI_DEGIL'|'TARIH_GECERSIZ'|'AYARDAN_FARKLI'}`. Yazar: `protokol_ayar` (`protokol_ayar_guncelle`), + yeniden hedefle tabloları.
+
+**`dogum_sonrasi_pg_hatirlatma()`** (M1:193, SQL STABLE; ACL yalnız `authenticated`) → `{ok:true, aktif:bool(=dogum_sonrasi_pg_gorev_aktif≠1), satirlar:[{hayvan_id,kupe_no,
+dogum_tarihi,gun:2|25}]}`; Aktif dişide bugün_TR − son doğum ∈ {2,25}, hayvan başına tek satır (ikiz tek), `gun,kupe_no` sıralı; bayrak 1 iken `satirlar` boş. Yazmaz; `RPC_TABLES` dışı.
+
+### İmza değişiklikleri (3) ve gövdesi değişen RPC'ler
+
+| İmza | Değişiklik | Kaynak |
+|---|---|---|
+| `start_first_service_protocol(p_gorev_id uuid, p_takip_onay boolean DEFAULT false, p_bagimsiz boolean DEFAULT false)` | +`p_bagimsiz` (DROP + CREATE; eski 2 arg çağrı aynı). Dönüş: normal `{ok,case_id,tohumlama_gorev_id,baslangic,d58_iptal,pg_gorev_iptal,ovsync_tren|null}`; **yeni kol** `{ok,basladi:false,gorev_id,yeniden_hedef,ovsync_tren:null}` (TREN yolunda gecikmiş/ritim dışı görev ilk trene taşınır, tren=bugün değilse başlamaz; `case_id` YOK); bayrak kapalı `ovsync_tren:null`, `p_bagimsiz` yok sayılır. Yeni hata `OVSYNC_TREN_UYELIK_YOK:{gorev_id,case_id,d0}` (TREN yolunda etiket NULL kalırsa fail-closed); `OVSYNC_ERKEN` aynen | M4:38 (ACL M4:617) |
+| `_ovsync_baslat_gorev_kur(p_hayvan_id text, p_baslangic date, p_kaynak_ref text, p_kural_tarihi date, p_hemen boolean DEFAULT false)` → uuid | +`p_hemen`; bayrak açıkken hedef `_ovsync_tren_gunu(kural)`, görev `tren − 2 ≤ bugün` olunca doğar, `p_hemen` kapıyı atlar (G7/G9/bastan). İç yardımcı: ACL yalnız `service_role`. `OVSYNC_BASLAT_PARAMETRE` aynen | M3:38 (ACL M3:1005) |
+| `_acik_disi_gorev_kur(p_hayvan_id text, p_hemen boolean DEFAULT false)` → uuid | +`p_hemen`; anahtar R10 `ACIK-DISI-<hayvan>-<kural>-<son tohumlama id|0>` (bayraktan bağımsız); 1-arg çağıranlar default'la çözülür; G7'de NULL → açık `OVSYNC_BASLAT` id'si ya da `OVSYNC_GOREV_ACILAMADI:{hayvan_id,sebep:'HEDEF_YOK'|'KURAMADI'}` (Boş ataması dahil geri sarılır). ACL yalnız `service_role` | M3:154 (ACL M3:1007) |
+
+İmzası aynı, gövdesi değişenler (md5 korumalı kopya; bayrak 0'da birebir eski): `dogum_kaydet` (PG görevleri `dogum_sonrasi_pg_gorev_aktif=1`'e bağlı, `gorev_sayisi` 5+7, M1:30),
+`_acik_disi_hedef_ic`, `ovsync_baslat_uyarilari`, `protokol_iptal`, `tohumlama_bos_ve_devam` (M3:200/291/377/497; `OVSYNC_SECIM_*`/`OVSYNC_GOREV_ACILAMADI`, dönüşte `ovsync_gorev_id`),
+`tedavi_sablon_uygula`, `_vaka_ac_tek` (M4:324/485; üyelik etiketi + `ovsync_bagimsiz`), `gorev_ertele`, `tohumlama_gorev_ertele`, `vaka_kalan_gunleri_kaydir` (+`ovsync_tren += p_gun`),
+`vaka_kalan_gunleri_kaydir_coklu` (Ovsync satırları atlanır, dönüşe `ovsync_atlanan:[{gorev_id,case_id,hayvan_id,kupe_no|null}]`), `ovsync_hastalik_gunu_ekle` (K9: `ovsync_tren` NULL +
+`ovsync_bagimsiz` true, dönüşe `tren_ayrildi`) (M5:33/182/274/460/638), `seans_tamamla` (M6:28; bayrak açık + aktif OVSYNC vaka: PG olay anı `now()`; PG1 tolerans aşımında dönüşe
+`ovsync_uyari:{kod:'PG1_TOLERANS_ASILDI',gecikme_gun,oneri:'BASTAN_BASLAT',case_id,kupe_no,planlanan_tarih,tamamlanan_tarih,bastan_tren_gunu}`; işlem başarılıdır).
+K10 kilit hatası (M2:226/243, çağrı M5): `OVSYNC_TREN_EKRANI:{gorev_id|case_id,hayvan_id,tren_gunu|null}` — `gorev_ertele`, `tohumlama_gorev_ertele`, `vaka_kalan_gunleri_kaydir` (iç bayrak
+yokken). Yeni iç yardımcılar (M2, authenticated/anon EXECUTE yok): `_ovsync_tren_aktif`, `_ovsync_tren_ayar`, `_ovsync_tren_gunu`, `_ovsync_tren_gunu_ic`, `_ovsync_tren_gunu_mu`, `_ovsync_asama`,
+`_ovsync_pg1_kayma`, `_ovsync_ic_ac`, `_ovsync_ic_mi`, `_ovsync_gorev_mu`, `_ovsync_kilit_gorev`, `_ovsync_kilit_vaka`. Yeni kolonlar `cases.ovsync_tren date`, `cases.ovsync_bagimsiz boolean NOT NULL DEFAULT false` (M2);
+ayar tohumları `ovsync_tren_aktif`, `ovsync_tren_capa` (YYYYMMDD), `ovsync_tren_one_cekme_gun`, `ovsync_pg_erteleme_tolerans_gun` (M2), `dogum_sonrasi_pg_gorev_aktif` (M1).
+
+---
+
 ## Hayvan Takip (migrations 20261031200001-000006; domain-rules §20)
 
 Migration dosyalarından yazıldı, canlı gövde kanıtı değildir; prod apply sahip kapısında. Beşi de SECURITY DEFINER; EXECUTE `authenticated, service_role`. Tablo `hayvan_takip`te `authenticated`

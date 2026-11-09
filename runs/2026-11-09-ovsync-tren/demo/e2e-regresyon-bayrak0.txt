@@ -1,0 +1,20 @@
+PASS T-56: dashboard 6. hücre "Ovsync" görünür; tıklayınca #pg-ovsync açılır
+PASS T-32/T-59: KPA şeridi 5 sayaç; render edilen bölüm başlıkları = dolu bölümler (boş gizli)
+PASS T-01/T-07/T-02/T-03: Boş→seçici; Ovsync ön seçili; PG kartı ürün/doz ÖN DOLU; TAKIP +7 gün
+PASS T-20: takipli+PG → TAKIP_ACIK onay sheet (#takip-acik-bs); Vazgeç yazma yapmaz
+PASS T-38/T-44: S2 "muayene vakti" rozeti (40 g eşik); "21" sabiti yok
+PASS T-04/T-05 K15: S2 "muayene vakti" → 🩺 sonuç ekranı; GEBELIK_KONTROL 5 seçim
+PASS T-25/T-26: muayeneyi ertele (+7) saatsiz → görev hedef +7, hedef_saat NULL
+PASS T-87: TAKIP_MUAYENE ekranı 4 seçim (TAKIP yok); ertelemede "N gündür takipte" onayı
+FAIL T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHUMLAMA), listeden düşer
+PASS T-73/T-89: jenerik gorev_tamamla GEBELIK_KONTROL kapatamaz; kizginlik_vaka_ac TAKIP_ACIK (2 varyant) + onaylı kapanış
+PASS T-84/T-85: takipte Gebe → tohumlama Gebe olur; üreme geçmişinde üstü çizili Boş + Gebe + göreli gün
+FAIL T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur; S3 🔍 takipte
+PASS Y-N3: + Hastalık modalı ön-dolu (gün 7, CAROFERTIN-E 20 ml, TAI chip) → Ekle günü açar, TAI +7, iptal yok
+PASS Y-N3b: Kistik Over seçiminde ön-öneri boş başlar; Ekle kist gününü açar
+PASS Y-N2: vaka detayında tek + Hastalık/+ İlaç çifti; Ekle sonrası timeline hastalık bloğu tazelenir
+PASS Y-N1: hayvan kartında girintili hastalık alt-satırı; ayrı hastalık satırı yok
+FAIL Y-N4: timeline hastalık bloğunda ilaç satırı ve TAI ertele soneki görünür
+PASS Y-CIFT-TIK: çift Ekle tek hastalık günü açar; tekrar mevcut döner, ilaç yinelenmez
+FAIL Y-NULL-PF: ailesi NULL vakada yedek tanımla + Hastalık görünür ve kayıt çalışır
+PASS Y-M5M7: günü tamamlanıp kapatılan hastalık-günlü vaka S4 rozeti taşır

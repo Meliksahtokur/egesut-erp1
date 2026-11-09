@@ -164,16 +164,21 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 ## 5. Doğum Kaydı
 
-### `dogum_kaydet` RPC'nin Yaptıkları (ilk yavru: 15 görev — 8 anne + 7 buzağı; 2.+ yavru: yalnız 7 buzağı görevi)
+### `dogum_kaydet` RPC'nin Yaptıkları (ilk yavru: bayrak `dogum_sonrasi_pg_gorev_aktif`=0 iken 12 görev — 5 anne + 7 buzağı; =1 iken 15 — 8 anne + 7 buzağı; 2.+ yavru: yalnız 7 buzağı görevi)
 
 1. `dogum` tablosuna kayıt ekler
 2. Buzağıyı `hayvanlar` tablosuna ekler (grup: Süt İçen Buzağı, padok: **Buzağı Padok (Süt İçenler)**)
 3. Buzağıya anne ırkı atanır
 4. Buzağıya baba bilgisi (`p_baba`) yazılır
 5. Annenin açık tohumlama kaydını `sonuc = 'Doğum Yaptı'` olarak kapatır
-6. Anneye doğum sonrası ilaç protokolü görevleri oluşturur (8 görev):
+6. Anneye doğum sonrası ilaç protokolü görevleri oluşturur (5 görev; bayrak `dogum_sonrasi_pg_gorev_aktif`=1 iken 3 PG ile 8):
    - Doğum günü: Oksitosin + Ademin + Kalsiyum (3 ayrı görev)
-   - 2. Gün: PG · 11. Gün: PG · 25. Gün: PG
+   - **Doğum sonrası PG (sahip 2026-11-09, UYGULANDI dalda `20261110100001`; prod apply ayrı sahip kapısı):** PG'ler (d2 · d25 · d39 Presynch-14 senkron)
+     artık ZORUNLU GÖREV DEĞİL. Bayrak `protokol_ayar.dogum_sonrasi_pg_gorev_aktif` = 0 (varsayılan): `dogum_kaydet` PG görevi
+     AÇMAZ (ilk yavru anne görevi 5), 2. ve 25. günde 🔔 panelde hatırlatma satırı çıkar (`dogum_sonrasi_pg_hatirlatma`;
+     görev değil, kapatma aksiyonu yok, rozet sayısına dahil). Bayrak = 1: eski davranış (3 PG görevi, anne görevi 8;
+     kod silinmedi, arşivde). Sonuç: 39. gün "senkron" PG'nin `OVSYNC_BASLAT` doğumunu bloklaması yeni doğumlarda oluşmaz.
+     Açık 18 PG görevi prod'da iptal edildi 2026-11-09 (runs/2026-11-09-ovsync-toplu-gun/prod-uygula-report.md).
    - 53. Gün: E Vitamini — TEK görev (etken_kod `E_VIT`; d53 Ademin ve d54 Yeldif görevi
      20260906000001 ile kaldırıldı; canlıda — deploy 2026-09-06)
    - 58-63. gün: kızgınlık takibi
@@ -455,11 +460,16 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
 
 1. **Ovsync kural günü (tek hesap noktası `_ovsync_kural_tarihi`):** düve `dogum_tarihi + 12 ay 21 gün`;
    doğum/abort geçmişi olan dişi `GREATEST(son doğum, son abort) + 51 gün`.
-2. **Görev doğumu:** `OVSYNC_BASLAT` görevi kural GÜNÜ doğar, önce doğmaz (tüm üretim yolları
-   `_ovsync_baslat_gorev_kur` çekirdeğinden geçer). Uyarı 2 gün önceden 🔔 panelin **🌱 İlk Tohumlama**
+2. **Görev doğumu:** bayrak `ovsync_tren_aktif`=0 iken `OVSYNC_BASLAT` görevi kural GÜNÜ doğar, önce doğmaz (tüm üretim
+   yolları `_ovsync_baslat_gorev_kur` çekirdeğinden geçer). **Bayrak açıkken (§18.19) görev TREN GÜNÜ − 2'de doğar**
+   (hedef = `_ovsync_tren_gunu(kural)`; öne çekme payı uyarıdan önce görünür); kullanıcının açık iradesiyle çağrılan yollar
+   (G7 Boş sonrası, G9 yeniden başlat, `ovsync_bastan_baslat`) `p_hemen` ile bu doğum kapısını atlar, hedef yine tren günüdür.
+   Uyarı 2 gün önceden 🔔 panelin **🌱 İlk Tohumlama**
    bölümüne düşer (`ovsync_baslat_uyarilari`); görevsiz satır "📅 Görev hedef gününde otomatik açılır"
-   der ve kural günü = bugün dahildir.
-3. **Başlatma penceresi:** hedef − 2 günden önce ▶ Başlat çizilmez ("📅 N gün sonra başlatılabilir";
+   der ve kural günü = bugün dahildir (bayrak açıkken görevsiz kolun hedefi de tren günüdür).
+3. **Başlatma penceresi / başlangıç günü:** başlangıç = hedef günü; bayrak kapalıyken hedef = kural günü (değişmez), bayrak
+   açıkken hedef = **tren günü** ve kural günü en çok 2 gün (`ovsync_tren_one_cekme_gun`) öne çekilerek trene binilir
+   (kural günü kendisi değişmez, §18.1). Hedef − 2 günden önce ▶ Başlat çizilmez ("📅 N gün sonra başlatılabilir";
    ✕ ve Ertele kalır); `start_first_service_protocol` erken çağrıyı `OVSYNC_ERKEN:{…}` ile reddeder.
    Otomatik yollar (zamanlayıcı, reconcile) yalnız `hedef <= bugün` görevleri başlatır.
 4. **Elle Vaka Aç (Ovsync hastalığı) — yaş kontrolü YOK, bilinçli:** sahip kararı (2026-09-26)
@@ -490,11 +500,19 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
    Vazgeç: plan yazılmaz, vaka kayıtlı kalır ("Vaka kayıtlı, tedavi planı uygulanmadı"). Gebe olabilecek hayvana Boş
    atamasız PG yolu açılmaz (`Onayla ve uygula` bu kapıda yok). Şablon dışı giriş noktalarının davranışı aynıdır.
 9. **Protokol iptal (`protokol_iptal`):** vaka `IPTAL` ile kapanır, açık gün/seans kapanır, stok iade
-   edilir; yeniden başlat görevi istenirse kural günü doğar (kural gelmeden görev satırı yok).
-10. **Erteleme:** ertelenebilir görev tipleri `gorev_ertele_kural` tablosundan okunur — JS'e tip listesi
+   edilir; yeniden başlat görevi istenirse kural günü doğar (kural gelmeden görev satırı yok); bayrak açıkken görev
+   tren günü − 2'de doğar, G9 yeniden başlat `p_hemen` ile kapıyı atlar (§18.2, §18.19).
+10. **Erteleme (Ovsync görevleri genel ertelemenin DIŞINDA, bayrak açıkken — K4–K7, K10):** **Ovsync görevi** (SQL
+    `_ovsync_gorev_mu` ↔ JS `ovsyncTrenGorevMu`, tek tanım): `OVSYNC_BASLAT`; aktif OVSYNC vakası olan hayvanın
+    `TOHUMLAMA_PLANLI`'sı (şablon TAI'si ya da `PG_TOHUMLAMA:*`); aktif OVSYNC vakanın günü olan `TEDAVI_GUN`/`TEDAVI_SEANS`.
+    `gorev_ertele` ve `tohumlama_gorev_ertele` bunlara, `vaka_kalan_gunleri_kaydir` aktif OVSYNC vakaya `OVSYNC_TREN_EKRANI`
+    verir; çoklu kaydırma Ovsync satırlarını atlar ve `ovsync_atlanan` döner. Ovsync görevi/vakası **yalnız Ovsync ekranı
+    RPC'leriyle** (§18.19) ertelenir/kaydırılır/sıfırlanır; görevler ekranı Ovsync için yalnız yapıldı/yapılmadı girer
+    ("Ovsync ekranında düzenle →"). Aynı hayvanın `ILAC`/`ASI`/`DIGER` ve Ovsync dışı vaka görevleri kilit dışıdır.
+    Aşama kuralları: 0 serbest · 1 PG ≤1 gün (birikimli) · 2 erteleme yok (§18.19). Diğer görevler için: ertelenebilir görev tipleri `gorev_ertele_kural` tablosundan okunur — JS'e tip listesi
     YAZILMAZ; `TEDAVI_GUN`/`TEDAVI_SEANS` ertelenmez (fail-closed, butonsuz). Çevrimdışıyken erteleme
     ve kaydırma butonları gizlenir, tetiklenirse "İnternet yok" toast'ı, RPC yok. "⏩ Kalan Günleri
-    Kaydır" yalnız açık günleri taşır, tamamlanan gün sabit kalır.
+    Kaydır" yalnız açık günleri taşır, tamamlanan gün sabit kalır (OVSYNC vakada bayrak açıkken aşama dalları, §18.19).
 11. **Gebe otoritesi:** `hayvanlar.tohumlama_durumu` gebelik otoritesi DEĞİLDİR; son `tohumlama.sonuc` esastır.
 12. **Kapsam:** tüm açık dişiler (Boş dahil); muaf: Gebe / Bekliyor / aktif senkronizasyon / Aktif değil /
     açık `OVSYNC_BASLAT` görevi olan.
@@ -509,7 +527,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     ÖMÜR BOYU sayar — bu kurala uymaz; kolon anlamı değişikliği ayrı sahip kararıdır, gösterim hesaplanır.
 15. **Boş sonrası devam (sahip 2026-09-28):** tohumlama sonucu **Boş** atanınca aynı modalda üç seçenek belirir:
     **PG uygula · Ovsync uygula · Takibe bırak** — seçim sonucu Boş atamasıyla **tek işlemde** bağlanır.
-    Varsayılan **hemen**; Takibe bırak = belirlenen gün sonunda belirlenen saatte takip görevi, varsayılan **7 gün**.
+    Varsayılan **hemen** (Ovsync uygula için bayrak açıkken **K8 sorusu**, §18.19: "🚆 Trene bin — <tren günü> (<n> hayvan)" ön seçili / "Bağımsız başlat — bugün"; tren günü = bugün ise tek seçenek "🚆 Bugün tren günü — başlat", R4); Takibe bırak = belirlenen gün sonunda belirlenen saatte takip görevi, varsayılan **7 gün**.
     Seçim ZORUNLU, ön seçim Ovsync; kısır ya da kural günü gelmemiş hayvanda Ovsync HARD BLOCK + gerekçe (§18.3/§18.5
     esnetilmez; istisna DB seed). Takip = rektal muayene görevi (saat = atama anı); takip açıkken otomatik
     `OVSYNC_BASLAT` açılmaz; DB beklenen olayla takibi kapatır: yeni tohumlama → sessiz; PG/Ovsync → onay penceresi
@@ -524,7 +542,41 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     sonuçsuz kapanmaz. Eski 40 g listesi + cron bu işle güncellenir. (sahip 2026-09-29) Erteleme YALNIZ bu sonuç
     ekranından (genel "ertele" butonu bu tiplerde yok); saat atanabilir, varsayılan SAATSİZ. Dashboard 40 g listesi
     satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
-18. **Hastalık = Ovsync içinde gün (karar 10, sahip 2026-10-13; karar 4/6'nın "alt vaka" kısmı GEÇERSİZ):** inaktif/kist için ayrı vaka AÇILMAZ — `cases.kaynak_vaka_id`, `inaktif_alt_vaka_ac/kapat`, alt-vaka trigger'ı, "dön" akışı YOKTUR. Hastalık günü = `treatment_days` satırı (`disease_id IS NOT NULL`); tekillik DB kısmi unique'idir (`treatment_days_hastalik_gun_uniq`: vaka+hastalık+tarih) — ikinci çağrı mevcut günü döner, ilaç tekrar yazılmaz, ertele tekrarlanmaz. İlaçlar o günün altına `add_drug_administration` ile (PG sarmalı dahil); açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile sorulan gün kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5 aynen); hastalık İnaktif Ovaryum, kist için Kistik Over — tek RPC `ovsync_hastalik_gunu_ekle` (karar 6-7); ön-öneri inaktifte CAROFERTIN-E 20 ml, kistte boş, +İlaç ile eklenebilir (karar 7); pencere TAI gününde biter. Kartta girintili alt-satır, ayrı vaka satırı yok. S4 kartındaki devam rozeti "🦠 Ovsync içinde hastalık günü" der, ebeveyn vaka detayına çıkar (gün id'sine değil); tek günde hastalık adı rozette görünür. Kısır hayvana hastalık günü açılmaz (`KISIR_HAYVANA_HASTALIK_GUNU_YOK`); kısır hard-block (§18.5) aynen.
+18. **Hastalık = Ovsync içinde gün (karar 10, sahip 2026-10-13; karar 4/6'nın "alt vaka" kısmı GEÇERSİZ):** inaktif/kist için ayrı vaka AÇILMAZ — `cases.kaynak_vaka_id`, `inaktif_alt_vaka_ac/kapat`, alt-vaka trigger'ı, "dön" akışı YOKTUR. Hastalık günü = `treatment_days` satırı (`disease_id IS NOT NULL`); tekillik DB kısmi unique'idir (`treatment_days_hastalik_gun_uniq`: vaka+hastalık+tarih) — ikinci çağrı mevcut günü döner, ilaç tekrar yazılmaz, ertele tekrarlanmaz. İlaçlar o günün altına `add_drug_administration` ile (PG sarmalı dahil); açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile sorulan gün kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5 aynen); hastalık İnaktif Ovaryum, kist için Kistik Over — tek RPC `ovsync_hastalik_gunu_ekle` (karar 6-7); ön-öneri inaktifte CAROFERTIN-E 20 ml, kistte boş, +İlaç ile eklenebilir (karar 7); pencere TAI gününde biter. Kartta girintili alt-satır, ayrı vaka satırı yok. S4 kartındaki devam rozeti "🦠 Ovsync içinde hastalık günü" der, ebeveyn vaka detayına çıkar (gün id'sine değil); tek günde hastalık adı rozette görünür. Kısır hayvana hastalık günü açılmaz (`KISIR_HAYVANA_HASTALIK_GUNU_YOK`); kısır hard-block (§18.5) aynen. **Hastalık günü girilen hayvan trenden ayrılır, BAĞIMSIZ devam eder (K9, sahip 2026-11-09):** `ovsync_tren` NULL + `ovsync_bagimsiz` true (kalıcı işaret, §18.19), dönüşte `tren_ayrildi`; sonraki hiçbir yol (çapa değişimi, yeniden hedefleme) onu trene bağlamaz. Zincir içi TAI ötelemesi iç bayrakla K10 kilidini geçer.
+19. **Ovsync treni (sahip 2026-11-09 — UYGULANDI dalda `20261110100002..008`; prod/demo apply ve bayrak açılışı ayrı sahip kapısı; bayrak `ovsync_tren_aktif`, varsayılan 0):**
+    Kurallar K1–K11 (spec `docs/plans/2026-11-09-ovsync-tren/design.md`), plan ruling'leri R1–R20
+    (`docs/plans/2026-11-09-ovsync-tren/PLAN.md`; L-DB ruling'leri RL-1..18 + RD9-1..6 `runs/2026-11-09-ovsync-tren/db/progress.md`).
+    Bayrak 0 iken davranış eski ile birebir. Özet:
+    - **Ritim (K1/K2, R1):** tren günü = çapa + 7k; çapa `protokol_ayar.ovsync_tren_capa` YYYYMMDD sayı (varsayılan 20261112,
+      Perşembe); `ovsync_tren_one_cekme_gun`=2, `ovsync_pg_erteleme_tolerans_gun`=1. Tek hesap `_ovsync_tren_gunu(kural)`
+      (`GREATEST(kural − öne_çekme, bugün_TR)`'den büyük-eşit ilk ritim günü; tarihler TR). Bozuk ayar → `OVSYNC_TREN_AYAR`
+      (sessiz eski davranışa düşülmez). Binen hayvanı olmayan tren görünmez (K3); liste bugün+28'e kadar, ötesi `ileri_sayisi` (R16).
+    - **Üyelik (R3):** `cases.ovsync_tren` = vakanın GnRH1 planlı günü (ritim sınıfı); günler k gün kayınca aynı işlemde += k.
+      **Bağımsızlık kalıcı işaretidir `cases.ovsync_bagimsiz` (D9, K8):** bayrak açıkken etiketi NULL kalan vaka (K8 bağımsız
+      seçimi, tren dışı D0, hastalık günü) işaretlenir; işaretli vaka hiçbir yoldan (çapa değişimi, `ovsync_tren_yeniden_hedefle`
+      dahil) trene girmez. Bayrak kapalıyken açılmış eski vaka işaretsizdir ve bayrak açılırken/çapa değişirken R14 ile trene bağlanabilir.
+    - **Elle başlatma (K8, R4):** 7 yol (V2 ▶ Başlat, V3 Vaka Aç, V4 Toplu Vaka Aç, V5 Şablon uygula, V6 Boş ata ve uygula, G7 Boş
+      sonrası "Ovsync uygula", G9 `protokol_iptal` yeniden başlat) "Trene bin / Bağımsız" sorusu sorar; tren günü = bugün ise
+      tek seçenek. Soru kapı DEĞİLDİR (§18.4 aynen). Çevrimdışı: soru modalı açılmaz, "İnternet yok", kuyruğa yazılmaz.
+    - **Aşama (R6, `_ovsync_asama`):** 0 GnRH1 yapılmadı · 1 GnRH1 yapıldı, PG1 değil · 2 PG1 yapıldı; tutarsız/seanssız/gün sayısı ≠ 4
+      → belirsiz (NULL, R6-EK). Aşama 0 erteleme serbest (sonraki trene); aşama 1 PG toplam ≤ tolerans (birikimli, `_ovsync_pg1_kayma`,
+      R18), aşılırsa baştan başlat; aşama 2 erteleme YOK: (a) `ovsync_pg48_tohumla` ya da (b) `ovsync_bastan_baslat` (K6, R12;
+      iki seçenek dışlayıcıdır).
+    - **Toptan erteleme (K7, R7):** `ovsync_tren_ertele(tarih, N 1..7, secimler)` tek işlem, kısmi başarı yok; kümesi X'te hedefli
+      `OVSYNC_BASLAT` + etiketi X ya da X−7 olan aktif vakalar; ileri D0'lı aşama 0 vakalar da N gün kayar (RL-14), ileri görevler
+      yeniden hedeflenir. Yalnız bugünden itibaren üyesi olan **ilk** ritim gününde (RL-16, `ONCEKI_TREN_VAR`). Aşama 1 tolerans içinde
+      kayar, aşarsa BASTAN (yeni tren X+N, RL-15); aşama 2 üye `p_secimler` ister (PG48/BASTAN; seçimsiz → `OVSYNC_TREN_SECIM_EKSIK`);
+      aşama belirsiz üye düşer (`OVSYNC_TREN_ERTELE_DUSTU`, tümü geri alınır; onay kapalı, "baştan başlat" önerilir). Ritim çapası N kalıcı kayar.
+      Bağımsız ve ritim dışı vakalar dokunulmaz.
+    - **K10 sahiplik** §18.10; **K11 geç tamamlama (R13):** bayrak açıkken OVSYNC seansında PG olay anı `now()` (LEAST kalkar); PG1
+      tolerans aşılırsa `seans_tamamla` dönüşüne `ovsync_uyari` (`PG1_TOLERANS_ASILDI`, baştan başlat önerisi) — işlem yine başarılıdır.
+    - **Ayar/göç (R14):** `ovsync_tren_ayar_guncelle` aynı işlemde `ovsync_tren_yeniden_hedefle(false)` koşar; üyelik yazımı yalnız
+      açılışta/çapa değişince (RL-18). Tüm yazan Ovsync RPC'leri `pg_advisory_xact_lock(hashtext('ovsync_tren'))` ile seri.
+    - **Yan düzeltmeler (R10, R19):** `ACIK-DISI-<hayvan>-<kural>-<son tohumlama>` anahtarı ve G7 fail-closed `OVSYNC_GOREV_ACILAMADI`
+      bayraktan bağımsızdır; `p_hemen`/`p_bagimsiz` default'ludur. Bayrak kapatma bunları geri almaz (geri dönüş yalnız tam geri).
+    - **Hatırlatma (R15):** §5.6. **Sapma (R20):** R4 spec §6'dan bilinçli sapmadır (tren = bugün → modalsız); sahip reddederse iki düğmeli
+      modal açılır, sunucu değişmez.
+    Ekranlar `ui-map.md` "Ovsync treni", RPC'ler `rpc-reference.md` "Ovsync Treni".
 
 ---
 

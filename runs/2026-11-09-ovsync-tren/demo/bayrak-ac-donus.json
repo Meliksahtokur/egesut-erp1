@@ -1,0 +1,205 @@
+{
+ "ok": true,
+ "capa": "2026-11-12",
+ "aktif": true,
+ "yeniden_hedef": {
+  "ok": true,
+  "capa": "2026-11-12",
+  "kuru": false,
+  "uyelik": [
+   {
+    "tren": "2026-10-29",
+    "case_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   }
+  ],
+  "gorevler": [
+   {
+    "eski": "2026-11-14",
+    "yeni": "2026-11-12",
+    "durum": "TASINIR",
+    "kupe_no": "5708",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2026-11-30",
+    "yeni": "2026-12-03",
+    "durum": "TASINIR",
+    "kupe_no": "45",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2026-12-04",
+    "yeni": "2026-12-03",
+    "durum": "TASINIR",
+    "kupe_no": "46",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2026-12-08",
+    "yeni": "2026-12-10",
+    "durum": "TASINIR",
+    "kupe_no": "51",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2026-12-25",
+    "yeni": "2026-12-24",
+    "durum": "TASINIR",
+    "kupe_no": "55",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2026-12-29",
+    "yeni": "2026-12-31",
+    "durum": "TASINIR",
+    "kupe_no": "56",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-01-08",
+    "yeni": "2027-01-07",
+    "durum": "TASINIR",
+    "kupe_no": "61",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-01-13",
+    "yeni": "2027-01-14",
+    "durum": "TASINIR",
+    "kupe_no": "62",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-02-27",
+    "yeni": "2027-02-25",
+    "durum": "TASINIR",
+    "kupe_no": "68",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-03-12",
+    "yeni": "2027-03-11",
+    "durum": "TASINIR",
+    "kupe_no": "74",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-04-09",
+    "yeni": "2027-04-08",
+    "durum": "TASINIR",
+    "kupe_no": "75",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-04-29",
+    "yeni": "2027-04-29",
+    "durum": "AYNI",
+    "kupe_no": "77",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-04-29",
+    "yeni": "2027-04-29",
+    "durum": "AYNI",
+    "kupe_no": "78",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-05-05",
+    "yeni": "2027-05-06",
+    "durum": "TASINIR",
+    "kupe_no": "79",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "<prod-id>"
+   },
+   {
+    "eski": "2027-06-16",
+    "yeni": "2027-06-17",
+    "durum": "TASINIR",
+    "kupe_no": "Test buzağı cabbiş",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000088"
+   },
+   {
+    "eski": "2027-06-27",
+    "yeni": "2027-07-01",
+    "durum": "TASINIR",
+    "kupe_no": "82",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000144"
+   },
+   {
+    "eski": "2027-07-18",
+    "yeni": "2027-07-22",
+    "durum": "TASINIR",
+    "kupe_no": "85",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000151"
+   },
+   {
+    "eski": "2027-07-22",
+    "yeni": "2027-07-22",
+    "durum": "AYNI",
+    "kupe_no": "87",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000153"
+   },
+   {
+    "eski": "2027-07-25",
+    "yeni": "2027-07-29",
+    "durum": "TASINIR",
+    "kupe_no": "88",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000154"
+   },
+   {
+    "eski": "2027-08-11",
+    "yeni": "2027-08-12",
+    "durum": "TASINIR",
+    "kupe_no": "92",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000158"
+   },
+   {
+    "eski": "2027-08-14",
+    "yeni": "2027-08-12",
+    "durum": "TASINIR",
+    "kupe_no": "94",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000160"
+   },
+   {
+    "eski": "2027-09-06",
+    "yeni": "2027-09-09",
+    "durum": "TASINIR",
+    "kupe_no": "97",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000163"
+   },
+   {
+    "eski": "2027-09-22",
+    "yeni": "2027-09-23",
+    "durum": "TASINIR",
+    "kupe_no": "3",
+    "gorev_id": "<prod-id>",
+    "hayvan_id": "H000166"
+   }
+  ],
+  "belirsiz_asama": [],
+  "belirsiz_sayisi": 0
+ }
+}

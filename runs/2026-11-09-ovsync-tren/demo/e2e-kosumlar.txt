@@ -1,0 +1,90 @@
+# ovsync-tren.spec.js koşum geçmişi (DM1 devam turu, 2026-11-09, demo vtzqjmazsvurxdeondmi, dal kodu :8137)
+
+## koşum 1
+  ✓   1 [chromium] › tests/e2e/ovsync-tren.spec.js:230:5 › trene bin: ▶ Başlat modalında Trene bin → vaka D0 = tren (20.4s)
+  ✘   2 [chromium] › tests/e2e/ovsync-tren.spec.js:243:5 › bağımsız başlat → D0 bugün, listede bağımsızlar (28.8s)
+  ✓   3 [chromium] › tests/e2e/ovsync-tren.spec.js:261:5 › V3 Vaka Aç + Ovsync şablonu: Trene bin → gün#1 = tren (27.0s)
+  ✓   4 [chromium] › tests/e2e/ovsync-tren.spec.js:277:5 › G7 Boş sonrası Ovsync uygula: Trene bin → görev hedefi tren; Bağımsız → vaka bugün (27.8s)
+  ✘   5 [chromium] › tests/e2e/ovsync-tren.spec.js:293:5 › geç tamamlama: PG1 seansı 2 gün geç → uyarı sheet'i (32.9s)
+  ✘   6 [chromium] › tests/e2e/ovsync-tren.spec.js:306:5 › görevler ekranı: Ovsync TAI'de Ertele yok (34.0s)
+  ✘   7 [chromium] › tests/e2e/ovsync-tren.spec.js:314:5 › aşama 2 (a): PG48 → kalan günler kapandı, TAI durur (36.0s)
+  ✘   8 [chromium] › tests/e2e/ovsync-tren.spec.js:330:5 › aşama 2 (b): baştan başlat → yeni görev tren günü (36.5s)
+  ✘   9 [chromium] › tests/e2e/ovsync-tren.spec.js:344:5 › toptan +1: önizleme KAYAR, onay sonrası görev hedefleri +1, başlık yeni gün (37.4s)
+  ✘  10 [chromium] › tests/e2e/ovsync-tren.spec.js:364:5 › toptan +3: aşama 1 BASTAN → eski vaka IPTAL (36.3s)
+    Error: expect(locator).toContainText(expected) failed
+    Error: expect(locator).toBeVisible() failed
+    Error: expect(locator).toHaveText(expected) failed
+    Error: expect(locator).toBeVisible() failed
+    Error: expect(locator).toBeVisible() failed
+    Error: expect(locator).toBeVisible() failed
+    Error: expect(locator).toBeVisible() failed
+  7 failed
+  3 passed (9.3m)
+RC=1
+
+## koşum 2
+  ✓   1 [chromium] › tests/e2e/ovsync-tren.spec.js:241:5 › trene bin: ▶ Başlat modalında Trene bin → vaka D0 = tren (18.4s)
+  ✓   2 [chromium] › tests/e2e/ovsync-tren.spec.js:254:5 › bağımsız başlat → D0 bugün, listede bağımsızlar (24.0s)
+  ✓   3 [chromium] › tests/e2e/ovsync-tren.spec.js:273:5 › V3 Vaka Aç + Ovsync şablonu: Trene bin → gün#1 = tren (21.1s)
+  ✘   4 [chromium] › tests/e2e/ovsync-tren.spec.js:289:5 › G7 Boş sonrası Ovsync uygula: Trene bin → görev hedefi tren; Bağımsız → vaka bugün (39.4s)
+  ✘   5 [chromium] › tests/e2e/ovsync-tren.spec.js:305:5 › geç tamamlama: PG1 seansı 2 gün geç → uyarı sheet'i (37.0s)
+  ✘   6 [chromium] › tests/e2e/ovsync-tren.spec.js:320:5 › görevler ekranı: Ovsync TAI'de Ertele yok (0ms)
+    Error: expect(locator).toBeVisible() failed
+  3 failed
+  4 did not run
+  3 passed (4.3m)
+RC=1
+
+## koşum 3
+  ✓   1 [chromium] › tests/e2e/ovsync-tren.spec.js:249:5 › trene bin: ▶ Başlat modalında Trene bin → vaka D0 = tren (25.9s)
+  ✓   2 [chromium] › tests/e2e/ovsync-tren.spec.js:262:5 › bağımsız başlat → D0 bugün, listede bağımsızlar (36.4s)
+  ✓   3 [chromium] › tests/e2e/ovsync-tren.spec.js:281:5 › V3 Vaka Aç + Ovsync şablonu: Trene bin → gün#1 = tren (20.8s)
+  ✓   4 [chromium] › tests/e2e/ovsync-tren.spec.js:297:5 › G7 Boş sonrası Ovsync uygula: Trene bin → görev hedefi tren; Bağımsız → vaka bugün (42.9s)
+  ✓   5 [chromium] › tests/e2e/ovsync-tren.spec.js:313:5 › geç tamamlama: PG1 seansı 2 gün geç → uyarı sheet'i (19.3s)
+  ✘   6 [chromium] › tests/e2e/ovsync-tren.spec.js:328:5 › aşama 2 (a): PG48 → kalan günler kapandı, TAI durur (38.0s)
+    Error: expect(locator).toBeVisible() failed
+  1 failed
+  4 did not run
+  5 passed (3.8m)
+RC=1
+
+## koşum 4
+  ✓   1 [chromium] › tests/e2e/ovsync-tren.spec.js:256:5 › trene bin: ▶ Başlat modalında Trene bin → vaka D0 = tren (19.6s)
+  ✓   2 [chromium] › tests/e2e/ovsync-tren.spec.js:269:5 › bağımsız başlat → D0 bugün, listede bağımsızlar (33.4s)
+  ✘   3 [chromium] › tests/e2e/ovsync-tren.spec.js:288:5 › V3 Vaka Aç + Ovsync şablonu: Trene bin → gün#1 = tren (1.1m)
+    Error: expect(locator).toBeVisible() failed
+  1 failed
+  7 did not run
+  2 passed (2.6m)
+RC=1
+
+## koşum 5
+  ✓   1 [chromium] › tests/e2e/ovsync-tren.spec.js:261:5 › trene bin: ▶ Başlat modalında Trene bin → vaka D0 = tren (23.1s)
+  ✓   2 [chromium] › tests/e2e/ovsync-tren.spec.js:274:5 › bağımsız başlat → D0 bugün, listede bağımsızlar (29.7s)
+  ✓   3 [chromium] › tests/e2e/ovsync-tren.spec.js:293:5 › V3 Vaka Aç + Ovsync şablonu: Trene bin → gün#1 = tren (22.2s)
+  ✓   4 [chromium] › tests/e2e/ovsync-tren.spec.js:309:5 › G7 Boş sonrası Ovsync uygula: Trene bin → görev hedefi tren; Bağımsız → vaka bugün (29.4s)
+  ✓   5 [chromium] › tests/e2e/ovsync-tren.spec.js:325:5 › geç tamamlama: PG1 seansı 2 gün geç → uyarı sheet'i (21.5s)
+  ✓   6 [chromium] › tests/e2e/ovsync-tren.spec.js:340:5 › aşama 2 (a): PG48 → kalan günler kapandı, TAI durur (27.1s)
+  ✓   7 [chromium] › tests/e2e/ovsync-tren.spec.js:356:5 › aşama 2 (b): baştan başlat → yeni görev tren günü (25.1s)
+  ✘   8 [chromium] › tests/e2e/ovsync-tren.spec.js:370:5 › toptan +1: önizleme KAYAR, onay sonrası görev hedefleri +1, başlık yeni gün (25.4s)
+    Error: expect(locator).toBeVisible() failed
+  1 failed
+  2 did not run
+  7 passed (4.1m)
+RC=1
+
+## koşum 6
+  ✓   1 [chromium] › tests/e2e/ovsync-tren.spec.js:264:5 › trene bin: ▶ Başlat modalında Trene bin → vaka D0 = tren (21.3s)
+  ✓   2 [chromium] › tests/e2e/ovsync-tren.spec.js:277:5 › bağımsız başlat → D0 bugün, listede bağımsızlar (41.2s)
+  ✓   3 [chromium] › tests/e2e/ovsync-tren.spec.js:296:5 › V3 Vaka Aç + Ovsync şablonu: Trene bin → gün#1 = tren (31.5s)
+  ✓   4 [chromium] › tests/e2e/ovsync-tren.spec.js:312:5 › G7 Boş sonrası Ovsync uygula: Trene bin → görev hedefi tren; Bağımsız → vaka bugün (44.0s)
+  ✓   5 [chromium] › tests/e2e/ovsync-tren.spec.js:328:5 › geç tamamlama: PG1 seansı 2 gün geç → uyarı sheet'i (20.8s)
+  ✓   6 [chromium] › tests/e2e/ovsync-tren.spec.js:343:5 › aşama 2 (a): PG48 → kalan günler kapandı, TAI durur (21.6s)
+  ✓   7 [chromium] › tests/e2e/ovsync-tren.spec.js:359:5 › aşama 2 (b): baştan başlat → yeni görev tren günü (32.6s)
+  ✓   8 [chromium] › tests/e2e/ovsync-tren.spec.js:373:5 › toptan +1: önizleme KAYAR, onay sonrası görev hedefleri +1, başlık yeni gün (27.5s)
+  ✓   9 [chromium] › tests/e2e/ovsync-tren.spec.js:393:5 › toptan +3: aşama 1 BASTAN → eski vaka IPTAL (36.8s)
+  ✘  10 [chromium] › tests/e2e/ovsync-tren.spec.js:409:5 › görevler ekranı: Ovsync TAI'de Ertele yok (42.3s)
+    expect(locator).toHaveCount(expected) failed
+  1 failed
+  9 passed (6.1m)
+RC=1
