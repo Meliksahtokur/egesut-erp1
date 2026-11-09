@@ -1,0 +1,91 @@
+{
+ "ekran": {
+  "basliklar": [
+   {
+    "baslik": "Tren · Per 29 Eki · 1 hayvan · Per 5 Kas: PG günü",
+    "n": 1,
+    "kart": 1,
+    "kupeler": [
+     "36"
+    ]
+   },
+   {
+    "baslik": "Tren · Çar 4 Kas · 1 hayvan · ritim dışı · Çar 4 Kas: başlangıç günü",
+    "n": 1,
+    "kart": 1,
+    "kupeler": [
+     "38"
+    ]
+   },
+   {
+    "baslik": "Tren · Per 5 Kas · 2 hayvan · Per 12 Kas: PG günü",
+    "n": 2,
+    "kart": 2,
+    "kupeler": [
+     "E2E-TREN-UI-03",
+     "E2E-TREN-UI-04"
+    ]
+   },
+   {
+    "baslik": "Tren · Cum 6 Kas · 1 hayvan · ritim dışı · Cum 13 Kas: PG günü",
+    "n": 1,
+    "kart": 1,
+    "kupeler": [
+     "E2E-TREN-UI-07"
+    ]
+   },
+   {
+    "baslik": "Tren · Cmt 7 Kas · 1 hayvan · ritim dışı · Cmt 7 Kas: başlangıç günü",
+    "n": 1,
+    "kart": 1,
+    "kupeler": [
+     "169"
+    ]
+   },
+   {
+    "baslik": "Tren · Pzt 9 Kas · 1 hayvan · ritim dışı · bugün: başlangıç günü",
+    "n": 1,
+    "kart": 1,
+    "kupeler": [
+     "E2E-TREN-UI-08"
+    ]
+   },
+   {
+    "baslik": "Tren · Per 12 Kas · 3 hayvan · Per 12 Kas: başlangıç günü Tren gününü ertele…",
+    "n": 3,
+    "kart": 3,
+    "kupeler": [
+     "5708",
+     "E2E-TREN-UI-01",
+     "E2E-TREN-UI-02"
+    ]
+   },
+   {
+    "baslik": "Tren · Per 3 Ara · 2 hayvan · Per 3 Ara: başlangıç günü",
+    "n": 2,
+    "kart": 2,
+    "kupeler": [
+     "46",
+     "45"
+    ]
+   }
+  ],
+  "yetim": 0,
+  "uyari": [],
+  "s3Tekrar": [],
+  "bagimsizBaslik": "Bağımsız · 5 hayvan"
+ },
+ "taiGorev": null,
+ "gorevFiltre": "today (yedek kart)",
+ "madde7Hayvan": "e2e40000-0000-4000-8000-000000000008",
+ "madde7Kart": "E2E-TREN-UI-08 OVSYNC BASLAT E2E-TREN-UI-08 09.11.2026 · bugün ▶ Başlat ✕ Ovsync ekranında düzenle →",
+ "madde7": {
+  "sheet": null,
+  "kart": true,
+  "gorunur": true,
+  "y": 392,
+  "vurgu": true,
+  "odakDegiskeni": "null"
+ },
+ "konsolHata": []
+}

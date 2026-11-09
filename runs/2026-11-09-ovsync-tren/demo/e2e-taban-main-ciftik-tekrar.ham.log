@@ -1,0 +1,7 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › tests/e2e/ovsync-takip.spec.js:867:5 › Y-CIFT-TIK: çift Ekle tek hastalık günü açar; tekrar mevcut döner, ilaç yinelenmez (25.1s)
+
+  1 passed (57.6s)
+RC=0

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20261031-13">
+<link rel="manifest" href="manifest.json?v=20261110-2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -639,6 +639,50 @@ body.dark .ac-vurgu{color:#8ec6ff}
 .ovs-takip-meta{font-size:11px;color:var(--purple);margin-top:3px}
 .ovs-sonlanan .ovs-rozet-gebe{background:#e8f5e9}
 .ovs-satir-bilinmiyor{display:flex;gap:8px;align-items:center}
+/* ═══ OVSYNC TRENİ yerleşim (N4-F4, mockup 02a/02b): yalnız düzen/boyut; renk F14'te.
+   Düğme sıfırlaması dışında zemin/çerçeve/şerit YOK (sahip kuralı). ═══ */
+.ovs-tren-bas{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:16px 14px 6px}
+.ovs-tren-ad{flex:1 1 auto;min-width:0;font-weight:800;font-size:15px;line-height:1.35}
+.ovs-tren-bas .ovs-tren-ertele{flex:0 0 auto}
+.ovs-tren-bugun,.ovs-tren-is,.ovs-tren-ritimdisi{font-weight:800}
+.ovs-tren-ertele,.ovs-duzenle-link{background:none;border:none;padding:0;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ovs-tren-not{font-size:12px;line-height:1.4;padding:0 14px 8px}
+.ovs-ayar-satir{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:13px;padding:10px 14px 2px}
+.ovs-asama{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ovs-asama-etiket{font-size:12px}
+.ovs-bagimsiz-alt{font-size:11px;margin-top:6px}
+.ovs-bh .ovs-n.ovs-tren-sayi{font-size:14px;font-weight:800;color:var(--ink2)}
+/* ═══ OVSYNC TRENİ (F14) — mockup _tren-yeni.css içeriği,
+   YALNIZ yazı rengi (sahip kuralı: satır zemini, sol şerit, krem/beyaz panel YOK;
+   sheet/modal mevcut stilde). Yerleşim/sınır/dolgu kuralları taşınmadı. ═══ */
+.ovs-tren-ad{color:var(--ink)}
+.ovs-tren-sayi{color:var(--ink2)}
+.ovs-tren-bugun{color:var(--red2)}
+.ovs-tren-ritimdisi{color:var(--amber)}
+.ovs-tren-ertele{color:var(--blue)}
+body.dark .ovs-tren-ertele,body.dark .ovs-mavi{color:#8ec6ff}
+.ovs-mavi{color:var(--blue)}
+.ovs-tren-not{color:var(--ink3)}
+.ovs-asama-etiket{color:var(--ink3)}
+.ovs-ayar-satir{color:var(--ink2)}
+.ovs-ayar-satir b{color:var(--ink)}
+.ovs-cip.on{color:var(--green2)}
+.ovs-on-grup{color:var(--ink3)}
+.ovs-on-kupe{color:var(--ink)}
+.ovs-on-asama{color:var(--ink3)}
+.ovs-kayar{color:var(--green2)}
+.ovs-bastan{color:var(--amber)}
+.ovs-secim{color:var(--red2)}
+.ovs-on-neden{color:var(--ink3)}
+.ovs-radyo{color:var(--ink2)}
+.ovs-radyo.on{color:var(--green2)}
+.ovs-bilgi-satir{color:var(--ink2)}
+.ovs-duzenle-link{color:var(--blue)}
+body.dark .ovs-duzenle-link{color:#8ec6ff}
+.ovs-tren-is{color:var(--ink2)}
+.ovs-tren-uyari{color:var(--amber)}
+.ovs-odak{color:var(--blue)}
+body.dark .ovs-odak{color:#8ec6ff}
 /* ═══ İSTATİSTİK ATÖLYESİ (AP1 T11 kabuk; sınıf sözlüğü T12-T15 içindir) ═══ */
 /* Renk: seçili/vurgu --green, kıyas/gri --ink3; durum ve hata şeritleri sakin gri, kırmızı/amber ve satır zemini yok */
 #pg-istatistik{min-width:0;max-width:100%}
@@ -2587,41 +2631,42 @@ body.dark .atolye-sayfa-baslik{color:var(--ink)}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20261031-13"></script>
-    <script src="js/gecmis.js?v=20261031-13"></script>
-    <script src="js/utils/modal.js?v=20261031-13"></script>
-    <script src="js/utils/errorHandler.js?v=20261031-13"></script>
-    <script src="js/utils/events.js?v=20261031-13"></script>
-    <script src="js/config.js?v=20261031-13"></script>
-    <script src="js/state.js?v=20261031-13"></script>
-    <script src="js/api.js?v=20261031-13"></script>
-    <script src="js/auth.js?v=20261031-13"></script>
-    <script src="js/tarih/tarih.js?v=20261031-13"></script>
-    <script src="js/ui.js?v=20261031-13"></script>
-    <script src="js/forms.js?v=20261031-13"></script>
-    <script src="js/hayvan-takip.js?v=20261031-13"></script>
-    <script src="js/hayvan-takip-pencere.js?v=20261031-13"></script>
-    <script src="js/ai-asistan.js?v=20261031-13"></script>
-    <script src="js/demo.js?v=20261031-13"></script>
-    <script src="vendor/cytoscape.min.js?v=20261031-13"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20261031-13"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20261031-13"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20261031-13"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20261031-13"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20261031-13"></script>
-    <script src="js/degisiklikler/etiketler.js?v=20261031-13"></script>
-    <script src="js/degisiklikler/diff.js?v=20261031-13"></script>
-    <script src="js/degisiklikler/degisiklikler.js?v=20261031-13"></script>
-    <script src="vendor/chart.umd.min.js?v=20261031-13"></script>
-    <script src="js/istatistik/cumle.js?v=20261031-13"></script>
-    <script src="js/istatistik/grafik.js?v=20261031-13"></script>
-    <script src="js/istatistik/kombinasyon.js?v=20261031-13"></script>
-    <script src="js/istatistik/gecici-fiyat.js?v=20261031-13"></script>
-    <script src="js/istatistik/kurucu.js?v=20261031-13"></script>
-    <script src="js/istatistik/pano.js?v=20261031-13"></script>
-    <script src="js/istatistik/atolye.js?v=20261031-13"></script>
-    <script src="js/app.js?v=20261031-13"></script>
-    <script src="js/utils/handlers.js?v=20261031-13"></script>
+    <script src="js/utils/helpers.js?v=20261110-2"></script>
+    <script src="js/gecmis.js?v=20261110-2"></script>
+    <script src="js/utils/modal.js?v=20261110-2"></script>
+    <script src="js/utils/errorHandler.js?v=20261110-2"></script>
+    <script src="js/utils/events.js?v=20261110-2"></script>
+    <script src="js/config.js?v=20261110-2"></script>
+    <script src="js/state.js?v=20261110-2"></script>
+    <script src="js/api.js?v=20261110-2"></script>
+    <script src="js/auth.js?v=20261110-2"></script>
+    <script src="js/tarih/tarih.js?v=20261110-2"></script>
+    <script src="js/ovsync-tren.js?v=20261110-2"></script>
+    <script src="js/ui.js?v=20261110-2"></script>
+    <script src="js/forms.js?v=20261110-2"></script>
+    <script src="js/hayvan-takip.js?v=20261110-2"></script>
+    <script src="js/hayvan-takip-pencere.js?v=20261110-2"></script>
+    <script src="js/ai-asistan.js?v=20261110-2"></script>
+    <script src="js/demo.js?v=20261110-2"></script>
+    <script src="vendor/cytoscape.min.js?v=20261110-2"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20261110-2"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20261110-2"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20261110-2"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20261110-2"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20261110-2"></script>
+    <script src="js/degisiklikler/etiketler.js?v=20261110-2"></script>
+    <script src="js/degisiklikler/diff.js?v=20261110-2"></script>
+    <script src="js/degisiklikler/degisiklikler.js?v=20261110-2"></script>
+    <script src="vendor/chart.umd.min.js?v=20261110-2"></script>
+    <script src="js/istatistik/cumle.js?v=20261110-2"></script>
+    <script src="js/istatistik/grafik.js?v=20261110-2"></script>
+    <script src="js/istatistik/kombinasyon.js?v=20261110-2"></script>
+    <script src="js/istatistik/gecici-fiyat.js?v=20261110-2"></script>
+    <script src="js/istatistik/kurucu.js?v=20261110-2"></script>
+    <script src="js/istatistik/pano.js?v=20261110-2"></script>
+    <script src="js/istatistik/atolye.js?v=20261110-2"></script>
+    <script src="js/app.js?v=20261110-2"></script>
+    <script src="js/utils/handlers.js?v=20261110-2"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->

@@ -416,6 +416,15 @@ const RPC_TABLES = {
   vaka_toplu_ac:             ['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log'],
   // P2 (Ovsync/PG): yeni RPC pull setleri
   start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu'],
+  // N4 UB1 (F13): tren yazma RPC'leri — PLAN 9 tablosu ∪ drug_administrations ∪
+  // start_first_service_protocol / protokol_iptal / seans_tamamla haritalarının tabloları.
+  // Salt-okuma tren RPC'leri (ovsync_tren_listele/onizle/ertele_onizle,
+  // dogum_sonrasi_pg_hatirlatma, ovsync_tren_yeniden_hedefle kuru) haritada DEĞİL (EG-10).
+  ovsync_tren_ertele:        ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu','protokol_ayar','protokol_instance'],
+  ovsync_hayvan_ertele:      ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu','protokol_ayar','protokol_instance'],
+  ovsync_bastan_baslat:      ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu','protokol_ayar','protokol_instance'],
+  ovsync_pg48_tohumla:       ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu','protokol_ayar','protokol_instance'],
+  ovsync_tren_ayar_guncelle: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu','protokol_ayar','protokol_instance'],
   tohumlama_gorev_ertele:    ['gorev_log','islem_log'],
   // K10-UI2 (karar 10): hastalık günü tek RPC — gün-aç + ilaçlar + TAI
   // öteleme (treatment_days/drug_administrations/stok) + ertele denetimi
@@ -1389,6 +1398,32 @@ function statHataKodu(err) {
 async function tohumlamaBosVeDevam(params) {
   try {
     const res = await rpc('tohumlama_bos_ve_devam', params);
+    _ovsyncTakipInvalidate();
+    return res;
+  } catch (e) {
+    _ovsyncTakipInvalidate();
+    throw e;
+  }
+}
+
+// ── OVSYNC TRENİ (N4 UB1) ──
+
+/**
+ * Tren yazma RPC'leri sarmalı (PLAN UB1): rpc'yi birebir taşır, dönüşü aynen verir.
+ * Çevrimdışı → Error('İnternet yok') (rpc yok, kuyruk YOK — S10); yazmalardan sonra
+ * _ovsyncTakipInvalidate() (tohumlamaBosVeDevam deseni: başarı + red yolunda).
+ * F10 alanları (gorev_hedef_eski, uye_kupeler) dönüşte aynen korunur — API katmanı daraltmaz.
+ * Bayrak kapalı yolu UB2+ kancalarında (ovsyncTrenAktif) ayrılır; burada bayrağa bakılmaz.
+ * @param {string} rpcAd - tren RPC adı
+ * @param {object} [params] - p_* parametreleri
+ * @returns {Promise<object>} RPC dönüşü (ok:true yolu)
+ */
+async function apiOvsyncTren(rpcAd, params = {}) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('İnternet yok');
+  }
+  try {
+    const res = await rpc(rpcAd, params);
     _ovsyncTakipInvalidate();
     return res;
   } catch (e) {

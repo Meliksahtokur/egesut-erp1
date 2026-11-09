@@ -649,6 +649,10 @@ function _ovsyncBayatEtiket(zaman){
  * Ovsync takip sayfasını yükler: P4 ovsyncTakipGetir'i çağırıp 4 durumdan birini
  * #ovsync-root'a yazar; render sonrası §6b kaydırma sözleşmesiyle ovsync'ten ayrılırken
  * saklanan konumu (window._ovsyncScrollY, app.js goTo) geri yükler. Render P6'da gelir.
+ * N4-F2 B1: tren bayrağı açıksa takip + ovsync_tren_listele PARALEL çekilir
+ * (Promise.allSettled); listele yanıtı aktif===true ise 3. argümanla tren yolu,
+ * hata/aktif!==true/offline'da 3. argüman undefined (eski Dalga yolu birebir).
+ * Bayrak kapalıyken ovsync_tren_listele ÇAĞRILMAZ.
  * TB-3: yerel (IDB) bağlam okuması askıda kalır/reddedilirse spinner'da KALMAZ — açık hata + Tekrar Dene.
  * @param {number} [zamanAsimiMs] Bağlam okuması zaman aşımı (test enjeksiyonu); sayı değilse OVSYNC_ZAMAN_ASIMI_MS.
  * @returns {Promise<void>}
@@ -659,24 +663,39 @@ async function loadOvsyncDash(zamanAsimiMs){
   // Gezinme durumu (§6b): padok filtresi + bölüm açık/kapalı — yazan UI P6'da gelir
   if(typeof window._curOvsyncPadok==='undefined') window._curOvsyncPadok=null;
   if(!window._curOvsyncBolum) window._curOvsyncBolum={acik:{}};
-  let getir=null;
-  if(typeof ovsyncTakipGetir==='function'){
-    try{ getir=await ovsyncTakipGetir(window._curOvsyncPadok||null); }
-    catch(_e){ getir={bayat:true,veri:null}; }
-  }else{
+  // N4-F2 B1 bayrak kapısı (F12: sunucu yanıtı kazanır — burası yalnız listele izni).
+  let trenAcik=false;
+  try{ trenAcik=(typeof ovsyncTrenAktif==='function'&&typeof getData==='function')?!!ovsyncTrenAktif(await getData('protokol_ayar')):false; }catch(_e){ trenAcik=false; }
+  const cevrimici=(typeof _ertelemeOnline==='function')?_ertelemeOnline():!(typeof navigator!=='undefined'&&navigator.onLine===false);
+  const takipCagir=async()=>{
+    if(typeof ovsyncTakipGetir==='function'){
+      try{ return await ovsyncTakipGetir(window._curOvsyncPadok||null); }
+      catch(_e){ return {bayat:true,veri:null}; }
+    }
     // P4 henüz yüklenmemişse (paralel geliştirme): önbellek varsa bayat, yoksa açık mesaj
     const onc=window.__ovsyncTakip||null;
-    getir=onc?{bayat:true,veri:onc.veri,zaman:onc.zaman}:{bayat:true,veri:null};
+    return onc?{bayat:true,veri:onc.veri,zaman:onc.zaman}:{bayat:true,veri:null};
+  };
+  let getir=null, trenVeri; // undefined = eski Dalga yolu birebir (m9 kilidi)
+  if(trenAcik&&cevrimici&&typeof rpc==='function'){
+    const sonuc=await Promise.allSettled([takipCagir(),(async()=>{ try{ return await rpc('ovsync_tren_listele',{}); }catch(_e){ return null; } })()]);
+    getir=(sonuc[0].status==='fulfilled'&&sonuc[0].value)?sonuc[0].value:{bayat:true,veri:null};
+    const tv=(sonuc[1].status==='fulfilled')?sonuc[1].value:null;
+    if(tv&&typeof tv==='object'&&tv.aktif===true) trenVeri=tv;
+  }else{
+    getir=await takipCagir();
   }
+  const bugunIso=(typeof bugun==='function')?bugun():undefined;
+  const trenArg=(trenVeri&&trenVeri.aktif===true)?trenVeri:undefined;
   const durum=_ovsyncDashDurum(getir);
   if(durum.tur==='taze'){
     // P6: satır aksiyon motorları IDB eşlemesiyle (RPC satırında case_id/görev id taşınmaz)
     if(!await _ovsyncBaglamYukle(zamanAsimiMs)) root.innerHTML=_ovsyncBaglamHataHtml();
-    else root.innerHTML=renderOvsyncSayfa(durum.veri);
+    else root.innerHTML=renderOvsyncSayfa(durum.veri,bugunIso,trenArg);
   }else if(durum.tur==='bayat'){
     // P6: bayat serit + bayat İÇERİK (sessiz boş YASAK — son bilinen veri gösterilir)
     if(!await _ovsyncBaglamYukle(zamanAsimiMs)) root.innerHTML=_ovsyncBaglamHataHtml();
-    else root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div>'+renderOvsyncSayfa(durum.veri)+'</div>';
+    else root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div>'+renderOvsyncSayfa(durum.veri,bugunIso,trenArg)+'</div>';
   }else if(durum.tur==='bayrak_kapali'){
     root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">🔒 Ovsync/PG kuralları kapalı — takip verisi yok</div></div>';
   }else{
@@ -685,6 +704,8 @@ async function loadOvsyncDash(zamanAsimiMs){
   // §6b: kaydırma sözleşmesi — ovsync'ten ayrılırken kaydedilen konumu geri yükle
   const ovPg=document.getElementById('pg-ovsync');
   if(ovPg&&typeof window._ovsyncScrollY==='number') ovPg.scrollTop=window._ovsyncScrollY;
+  // N4-F4 B1: "Ovsync ekranında düzenle →" odağı — konum geri yüklemesinden SONRA.
+  _ovsyncOdakTuket(root);
 }
 
 // ═══ OVSYNC TAKİP RENDER (P6 — S0–S4 + KPA şeridi; plan madde P6, design §3/§4/§4b/§5/§7) ═══
@@ -1941,7 +1962,7 @@ function _ovsyncMuayeneSatirAc(hayvanId, gorevId){
  * @param {string} [bugunIso] 'YYYY-MM-DD' (saf test için; yoksa bugun()).
  * @returns {string} Sayfa HTML'i (#ovsync-root içeriği).
  */
-function renderOvsyncSayfa(veri, bugunIso){
+function renderOvsyncSayfa(veri, bugunIso, trenVeri){
   const bg=(typeof bugunIso==='string'&&bugunIso)?bugunIso:(typeof bugun==='function'?bugun():'');
   const st=(typeof window!=='undefined'?window:{});
   st._curOvsyncBolum=st._curOvsyncBolum||{acik:{}};
@@ -1958,6 +1979,18 @@ function renderOvsyncSayfa(veri, bugunIso){
   let h='';
   // KPA şeridi — sayı yoksa da çizilir (hücreler 'bilinmiyor'); sessiz boş YASAK
   h+=_ovsyncKpaHtml(kpa);
+  // UB2 tren dalı (BOŞLUK-5/F1/F9): trenVeri.aktif===true (sunucu kazanır, F12)
+  // ise S0∪S1 tren grupları; kapalıysa aşağıdaki eski S0/S1 yolu aynen (m4 kilidi).
+  const trenAcik=(typeof _ovsyncTrenSayfaAcik==='function')?_ovsyncTrenSayfaAcik(trenVeri):false;
+  if(trenAcik){
+    // N4-F4 Y3: trendeki aşama-0 (OVSYNC_BASLAT) üyeler tren kartı olur, S3'te tekrar görünmez.
+    const trenUye=new Set();
+    (Array.isArray(trenVeri.trenler)?trenVeri.trenler:[]).forEach(t=>(t&&Array.isArray(t.uyeler)?t.uyeler:[])
+      .forEach(u=>{ if(u&&u.hayvan_id!=null) trenUye.add(String(u.hayvan_id)); }));
+    const s3Tren=grp.S3.filter(s=>s&&s.hayvan_id!=null&&trenUye.has(String(s.hayvan_id)));
+    grp.S3=grp.S3.filter(s=>s3Tren.indexOf(s)<0);
+    h+=_ovsyncTrenGovdeHtml(Object.assign({},grp,{S3:s3Tren}),bg,trenVeri);
+  }else{
   // S0: canlı kartlar — boşsa bölüm tamamen gizli
   if(grp.S0.length){
     const nb=grp.S0.filter(s=>_ovsyncS0Tip(s)==='bugun').length;
@@ -1982,6 +2015,7 @@ function renderOvsyncSayfa(veri, bugunIso){
         +dg.tekil.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
     }
     h+=_ovsyncBolumHtml('S1',grp.S1,bg,govde,grp.S1.length+' vaka · '+dg.gruplar.length+' dalga');
+  }
   }
   // S2: sonuç bekleyenler (sayaç/vakti satırları)
   if(grp.S2.length){
@@ -2009,6 +2043,1147 @@ function renderOvsyncSayfa(veri, bugunIso){
       +bilinmeyen.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
   }
   return '<div class="pg-inner">'+h+'</div>';
+}
+/**
+ * Tren dalı kapısı (F12: sunucu yanıtı kazanır): listele dönüşü aktifse tren
+ * yolu açılır. Kapalıysa eski yol aynen çalışır (kopya fonksiyon yok).
+ * @param {Object|null} trenVeri ovsync_tren_listele dönüşü.
+ * @returns {boolean} Tren yolu açık mı.
+ */
+function _ovsyncTrenSayfaAcik(trenVeri){
+  return !!(trenVeri&&typeof trenVeri==='object'&&trenVeri.aktif===true
+    &&typeof ovsyncTrenGrupla==='function'&&typeof ovsyncTrenBaslikHtml==='function');
+}
+/**
+ * BOŞLUK-1: aşama-2 kartında PG+48 satırı — pg1_zaman varsa "≈ <gün> <saat>"
+ * (pg1_zaman + 48 s, Europe/Istanbul), yoksa yalnız "PG1 + 48 s'te tohumla".
+ * @param {Object} uye Tren üyesi {asama, pg1_zaman}.
+ * @returns {string} Etiket satırı; aşama-2 değilse ''.
+ */
+function _ovsyncPg48SatirHtml(uye){
+  if(!uye||typeof uye!=='object'||uye.asama!==2) return '';
+  const ms=uye.pg1_zaman?Date.parse(uye.pg1_zaman):NaN;
+  const duz='PG1 + 48 s\'te tohumla';
+  if(!isFinite(ms)) return '<span class="ovs-asama-etiket">'+duz+'</span>';
+  try{
+    const d=new Date(ms+48*3600*1000);
+    const bic=(o)=>new Intl.DateTimeFormat('tr-TR',Object.assign({timeZone:'Europe/Istanbul'},o)).format(d);
+    return '<span class="ovs-asama-etiket">≈ '+esc(bic({weekday:'short',day:'numeric',month:'short'})+' '+bic({hour:'2-digit',minute:'2-digit',hour12:false}))+'</span>';
+  }catch(e){ return '<span class="ovs-asama-etiket">'+duz+'</span>'; }
+}
+/**
+ * F1: takip satırı + tren üyesinin aşama aksiyonu (S0 kartları dahil,
+ * BOŞLUK-5). Üye yoksa ya da çevrimdışıysa taban kart aynen döner.
+ * @param {Object} satir Takip satırı.
+ * @param {string} bugunIso TR bugünü.
+ * @param {Object|null} uye Eşleşen tren üyesi (yoksa null).
+ * @param {boolean} online Çevrimiçi mi.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncTrenSatirHtml(satir, bugunIso, uye, online){
+  const taban=(satir&&satir.bolum==='S3')?_ovsyncTrenBaslatKartHtml(satir,bugunIso):_ovsyncSatirHtml(satir,bugunIso);
+  const hid=satir&&satir.hayvan_id!=null?satir.hayvan_id:null;
+  if(!uye||online!==true||typeof ovsyncAsamaAksiyonHtml!=='function') return _ovsyncKartaEkle(taban,'',hid);
+  return _ovsyncKartaEkle(taban,ovsyncAsamaAksiyonHtml(uye,true,bugunIso)+_ovsyncPg48SatirHtml(uye),hid);
+}
+/**
+ * N4-F4 Y4: ek satırı (aşama aksiyonu / alt satır) kartın İÇİNE, kapanış div'inden önce
+ * koyar; kart kökü odak için data-ovs-hayvan taşır (B1). Kart biçimi tanınmazsa ek sona.
+ * @param {string} kart Kart HTML'i ('<div class="ovs-kart…">…</div>').
+ * @param {string} ek Eklenecek HTML.
+ * @param {string|null} hayvanId Hayvan id (odak hedefi).
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncKartaEkle(kart, ek, hayvanId){
+  let k=String(kart||'');
+  if(hayvanId!=null&&k.indexOf('<div class="ovs-kart')===0) k='<div data-ovs-hayvan="'+escAttr(hayvanId)+'"'+k.slice(4);
+  if(!ek) return k;
+  return /<\/div>$/.test(k)?k.slice(0,-6)+ek+'</div>':k+ek;
+}
+/**
+ * N4-F4 Y3: trende bekleyen aşama-0 üyenin kartı (S3 satırından): küpe + grup + taban,
+ * başlangıç günü ve ▶ Başlat (pencere/kısır kilidi aynen). Ertele yok — trende
+ * "Sonraki trene aktar" aksiyonu karta eklenir.
+ * @param {Object} satir S3 takip satırı {hayvan_id, kupe_no, grup, taban_turu, dalga_anahtari}.
+ * @param {string} bugunIso TR bugünü.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncTrenBaslatKartHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const gorev=bag.baslat.get(satir.hayvan_id)||null;
+  const d=typeof satir.dalga_anahtari==='string'?satir.dalga_anahtari:null;
+  const pencereGun=d?_ovsyncBaslatPencereGunu({hedef_tarih:d}):null;
+  const btn=gorev?_ovsyncBaslatKilitHtml(bag.kisir.has(satir.hayvan_id),gorev.id,satir.hayvan_id,false,pencereGun):'';
+  const tabanAd=_ovsyncTabanEtiketi(satir.taban_turu);
+  return '<div class="ovs-kart"><div class="ovs-ust"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
+    +'</span><span class="ovs-etiket">'+esc(satir.grup||'bilinmiyor')+'</span>'
+    +(tabanAd!=='bilinmiyor'?'<span class="ovs-etiket">'+esc(tabanAd)+'</span>':'')+'</div>'
+    +'<div class="ovs-alt"><span class="ovs-bilgi">başlamadı · başlangıç '+esc(d?_ovsyncGunAy(d):'bilinmiyor')+'</span>'+btn+'</div>'
+    +'</div>';
+}
+/**
+ * Tren grupları gövdesi (BOŞLUK-5/F1/F9): S0∪S1 üyelik eşleşmesi; başlık sayısı
+ * sunucunun uyeler.length'i; ertele düğmesi yalnız ilk tarihte (F9:
+ * ovsyncIlkToptanTarih); bağımsızlar ayrı blok; eşleşmeyen satır düşürülmez (§7.8).
+ * @param {Object} grp Bölüm grupları {S0, S1}.
+ * @param {string} bg TR bugünü.
+ * @param {Object} trenVeri ovsync_tren_listele dönüşü.
+ * @returns {string} Bölüm HTML'i.
+ */
+function _ovsyncTrenGovdeHtml(grp, bg, trenVeri){
+  const online=(typeof _ertelemeOnline==='function')?_ertelemeOnline():true;
+  const tg=ovsyncTrenGrupla((grp.S0||[]).concat(grp.S1||[],grp.S3||[]),trenVeri);
+  const uye=new Map();
+  const uyeKoy=(u)=>{ if(u&&u.hayvan_id!=null){ const k=String(u.hayvan_id); if(!uye.has(k)) uye.set(k,u); } };
+  (Array.isArray(trenVeri.trenler)?trenVeri.trenler:[]).forEach((t)=>{
+    (Array.isArray(t&&t.uyeler)?t.uyeler:[]).forEach(uyeKoy);
+  });
+  (Array.isArray(trenVeri.bagimsizlar)?trenVeri.bagimsizlar:[]).forEach(uyeKoy);
+  const ilk=(typeof ovsyncIlkToptanTarih==='function')?ovsyncIlkToptanTarih(trenVeri,bg):undefined;
+  // N4-F3 H2: aynı X'i işaret eden ikinci başlık düğmesiz (null → ovsyncTrenBaslikHtml çizmez).
+  const dugmeTren=(typeof ovsyncToptanBaslikTreni==='function')?ovsyncToptanBaslikTreni(trenVeri,bg):undefined;
+  const ilkFor=(tr)=>(dugmeTren!==undefined&&String(tr&&tr.tren_gunu).slice(0,10)!==dugmeTren)?null:ilk;
+  const kart=(s)=>_ovsyncTrenSatirHtml(s,bg,s&&s.hayvan_id!=null?uye.get(String(s.hayvan_id))||null:null,online);
+  // BOŞLUK-3 alt satırı: ayrı extract ctx'lerinde (UB2) helper yoksa kart aynen
+  // çizilir (UB2 beklentisi korunur); üretimde aynı dosya olduğundan her zaman var.
+  const altSatirFn=(typeof _ovsyncBagimsizAltSatirHtml==='function')?_ovsyncBagimsizAltSatirHtml:null;
+  const kartBagimsiz=(s)=>{
+    const u=s&&s.hayvan_id!=null?uye.get(String(s.hayvan_id))||null:null;
+    return _ovsyncKartaEkle(kart(s),altSatirFn?altSatirFn(u):'',null);
+  };
+  let govde='';
+  // N4-F2 Parca3: ayar satırı tren yolunun üstünde (mockup 06); çevrimdışı
+  // çizilmez (PLAN UB3). typeof kapısı UB3 surgical ctx uyumu için.
+  if(typeof _ovsyncAyarSatirHtml==='function') govde+=_ovsyncAyarSatirHtml(trenVeri,online);
+  tg.gruplar.forEach((g)=>{
+    govde+=ovsyncTrenBaslikHtml(g[2],bg,online,ilkFor(g[2]))+g[1].map(kart).join('');
+    // N4-F4 Y3: başlık N (sunucu uyeler.length) = kart sayısı; değilse görünür uyarı + konsol.
+    const uyeler=Array.isArray(g[2].uyeler)?g[2].uyeler:[];
+    if(uyeler.length!==g[1].length){
+      const var_=new Set(g[1].map(s=>String(s.hayvan_id)));
+      const eksik=uyeler.filter(u=>u&&!var_.has(String(u.hayvan_id))).map(u=>u.kupe_no||u.hayvan_id);
+      const m='⚠ Sunucu '+uyeler.length+' hayvan diyor, ekranda '+g[1].length+' kart'+(eksik.length?' (takip satırı yok: '+eksik.join(', ')+')':'');
+      console.warn('Ovsync tren '+g[0]+': '+m);
+      govde+='<div class="ovs-tren-not ovs-tren-uyari">'+esc(m)+'</div>';
+    }
+  });
+  const bagSayi=Array.isArray(trenVeri.bagimsizlar)?trenVeri.bagimsizlar.length:0;
+  if(tg.bagimsiz.length){
+    govde+='<div class="ovs-bolum"><div class="ovs-bh"><h2>Bağımsız</h2><span class="ovs-n ovs-tren-sayi">'
+      +esc('· '+bagSayi+' hayvan')+'</span></div><div class="ovs-tren-not">Trene sayılmaz. Tren ertelemesi bunlara dokunmaz; aşama kuralları (erteleme sınırları) bunlara da uygulanır.</div>'
+      +tg.bagimsiz.map(kartBagimsiz).join('')+'</div>';
+  }
+  if(tg.tekil.length){
+    govde+='<div class="ovs-bolum"><div class="ovs-bh"><h2>Diğer</h2><span class="ovs-n">'
+      +esc(String(tg.tekil.length)+' satır')+'</span></div>'+tg.tekil.map((s)=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+  }
+  return '<div class="ovs-bolum"><div class="ovs-bh"><h2>Trenler</h2><span class="ovs-n">'
+    +esc(String(tg.gruplar.length)+' tren · '+bagSayi+' bağımsız')+'</span></div>'+govde+'</div>';
+}
+/**
+ * Toptan önizleme gövdesi (F4/F5/BOŞLUK-2): UA1 önizlemesi + dokunulmaz sayısı
+ * (yalnız sayı, küpe yok) + ileri_vakalar satırı. Onay kapalılığı UA1'de (fail-closed).
+ * @param {Object} plan ovsync_tren_ertele_onizle dönüşü.
+ * @param {Object} secimler {case_id: 'PG48'|'BASTAN'}.
+ * @param {string} bugunIso TR bugünü.
+ * @returns {string} Önizleme HTML'i.
+ */
+function _ovsyncToptanGovdeHtml(plan, secimler, bugunIso){
+  const p=plan&&typeof plan==='object'?plan:{};
+  let h=ovsyncToptanOnizlemeHtml(p,secimler,bugunIso);
+  const dok=p.dokunulmaz&&typeof p.dokunulmaz==='object'?p.dokunulmaz:null;
+  if(dok){
+    const b=isFinite(+dok.bagimsiz)?+dok.bagimsiz:0;
+    const r=isFinite(+dok.ritim_disi)?+dok.ritim_disi:0;
+    h+='<div class="ovs-bilgi-satir">'+esc('Dokunulmaz: '+b+' bağımsız · '+r+' ritim dışı')+'</div>';
+  }
+  const ileri=Array.isArray(p.ileri_vakalar)?p.ileri_vakalar.filter(Boolean):[];
+  if(ileri.length){
+    const kupeler=ileri.map((v)=>v.kupe_no).filter((k)=>k!=null&&k!=='').map(String).slice(0,6).join(', ');
+    h+='<div class="ovs-bilgi-satir">'+esc(ileri.length+' ileri vaka yeni ritme taşınır'+(kupeler?' ('+kupeler+')':'')+'.')+'</div>';
+  }
+  return h;
+}
+// ═══ OVSYNC TRENİ KART YARDIMCILARI (UB3: BOŞLUK-3 + F10 + F15 + F8) ═══
+// Saf metin/karar üreticiler (toast/textContent/innerHTML'e esc'li basılır).
+// Eylem akışları (toptan/ertele RPC'leri) UB4'ün; burası kart + K8-modal girişi.
+/**
+ * TR kısa gün: "Per 19 Kas" (UTC aritmetiği; toISOString slice YOK).
+ * forms.js `_ovsyncTrenTarihAd` ile aynı matematik (çapraz dosya çağrısı yok —
+ * ui.js bağımsız extract edilir).
+ * @param {string} iso 'YYYY-MM-DD'.
+ * @returns {string} Kısa gün adı + gün + ay; geçersizse ham girdi.
+ */
+function _ovsyncK8GunAd(iso){
+  const G=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const A=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
+  if(!m) return String(iso==null?'':iso);
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  if(d.getUTCMonth()!==+m[2]-1||d.getUTCDate()!==+m[3]) return String(iso);
+  return G[d.getUTCDay()]+' '+d.getUTCDate()+' '+A[d.getUTCMonth()];
+}
+/**
+ * BOŞLUK-3: bağımsız kart alt satırı — üye kaydında ne varsa (küpe, sonraki
+ * iş/tür + tarih); neden/hastalık adı ASLA yazılmaz (istemci türetimi yok).
+ * Sonraki iş yoksa satır çizilmez (kartın kendisi yeterli).
+ * @param {Object} uye bagimsizlar[] üyesi {kupe_no, sonraki_is?}.
+ * @returns {string} Alt satır HTML'i ya da ''.
+ */
+function _ovsyncBagimsizAltSatirHtml(uye){
+  const u=uye&&typeof uye==='object'?uye:{};
+  const si=u.sonraki_is&&typeof u.sonraki_is==='object'?u.sonraki_is:null;
+  if(!si||!si.tarih) return '';
+  const tur=si.tur!=null&&String(si.tur)!==''?String(si.tur):'iş';
+  const kupe=u.kupe_no!=null&&String(u.kupe_no)!==''?String(u.kupe_no):'';
+  return '<div class="ovs-bagimsiz-alt">'+esc((kupe?kupe+' · ':'')+tur+' '+_ovsyncGunAy(si.tarih))+'</div>';
+}
+/**
+ * F10 sayı kuralı: "(n hayvan)" = uye_kupeler.length (sorulan hayvan hariç
+ * küme; sözleşme M4:598). Dizi yoksa uye_sayisi korunur.
+ * @param {Object} onizleme ovsync_tren_onizle dönüşü.
+ * @returns {number} Hayvan sayısı (geçersizse 0).
+ */
+function _ovsyncK8HayvanSayisi(o){
+  const oo=o&&typeof o==='object'?o:{};
+  if(Array.isArray(oo.uye_kupeler)) return oo.uye_kupeler.length;
+  const n=Number(oo.uye_sayisi);
+  return Number.isFinite(n)&&n>=0?Math.floor(n):0;
+}
+/**
+ * F10: gecikmiş görev cümlesi — gorev_hedef_eski ise "Görev <eski> yerine
+ * <tren> trenine taşınır." Aksi her durumda '' (sessiz yok, satır yok).
+ * @param {Object} onizleme ovsync_tren_onizle dönüşü {gorev, gorev_hedef_eski, tren_gunu}.
+ * @returns {string} Not HTML'i ya da ''.
+ */
+function _ovsyncK8GecikmisNotHtml(o){
+  const oo=o&&typeof o==='object'?o:{};
+  if(oo.gorev_hedef_eski!==true) return '';
+  const g=oo.gorev&&typeof oo.gorev==='object'?oo.gorev:null;
+  const eski=g&&g.hedef_tarih?String(g.hedef_tarih).slice(0,10):'';
+  const tren=oo.tren_gunu?String(oo.tren_gunu).slice(0,10):'';
+  if(!eski||!tren) return '';
+  return '<div class="ovs-gecikmis-not">'
+    +esc('Görev '+_ovsyncK8GunAd(eski)+' yerine '+_ovsyncK8GunAd(tren)+' trenine taşınır.')+'</div>';
+}
+/**
+ * F10 K8-modal girişi (V2/G7/G9 kancaları bunu kullanır): sayıyı
+ * uye_kupeler.length'e sabitler, UA1 modalını kurar, gecikmişse F10 notunu
+ * modal gövdesinin başına ekler. UA1 tarafı cümleyi zaten taşıyorsa (P1)
+ * dokunulmaz — çift satır yok.
+ * @param {Object} onizleme ovsync_tren_onizle dönüşü (+ kupe_no/kural_tarihi/uye_kupeler).
+ * @returns {string} Modal HTML'i.
+ */
+function _ovsyncK8ModalHtml(o){
+  const oo=o&&typeof o==='object'?Object.assign({},o):{};
+  if(Array.isArray(oo.uye_kupeler)) oo.uye_sayisi=oo.uye_kupeler.length;
+  if(typeof ovsyncTrenSoruHtml!=='function') return '';
+  const taban=ovsyncTrenSoruHtml(oo);
+  const not=_ovsyncK8GecikmisNotHtml(oo);
+  if(!not||taban.indexOf('trenine taşınır')!==-1) return taban;
+  const acilis='<div class="m-body">';
+  const i=taban.indexOf(acilis);
+  if(i===-1) return taban+not;
+  return taban.slice(0,i+acilis.length)+not+taban.slice(i+acilis.length);
+}
+/**
+ * Kart karar bağlamı (UB4, senkron best-effort): yalnız Ovsync-dişi tiplerde
+ * null (karar gereksiz); bayrak state'ten okunamaz/kapalıysa null (eski yol,
+ * fail-closed); açıksa hayvan kümesi _ovsyncKartHayvanKur kümesi ∪ bağlam vakaAktif (N4-F3 H1).
+ * Gün kümesi senkron erişilemez (treatment_days IDB) → boş küme; N4-F2 K8:
+ * TEDAVI_GUN / TEDAVI_SEANS kolu ölüydü (boş kümeyle ovsyncTrenGorevMu
+ * daima false) — kapıda elenir, bu satırlar doğrudan eski yoldadır.
+ * @param {Object} t Görev satırı {gorev_tipi}.
+ * @returns {Object|null} {hayvanIdSet, gunIdSet, aktif} ya da null (eski yol).
+ */
+function _ovsyncKartKararBaglami(t){
+  const tip=t&&(t.gorev_tipi||null);
+  if(tip!=='OVSYNC_BASLAT'&&tip!=='TOHUMLAMA_PLANLI') return null;
+  if(typeof ovsyncTrenAktif!=='function') return null;
+  let ayar=null;
+  try{ ayar=(typeof getState==='function')?getState('protokol_ayar'):null; }catch(e){ return null; }
+  if(!ayar) return null;
+  try{ if(!ovsyncTrenAktif(ayar)) return null; }catch(e){ return null; }
+  // N4-F3 H1: küme IDB vakalarından (Ovsync ekranından bağımsız); ekran bağlamı varsa yalnız eklenir.
+  const hayvanIdSet=new Set();
+  const kume=globalThis._ovsyncKartHayvanlar;
+  if(kume&&typeof kume.forEach==='function') kume.forEach(h=>hayvanIdSet.add(h));
+  try{ const bag=(typeof _ovsyncBaglamAl==='function')?_ovsyncBaglamAl():null;
+    if(bag&&bag.vakaAktif&&typeof bag.vakaAktif.forEach==='function') bag.vakaAktif.forEach((c,h)=>{ if(h!=null) hayvanIdSet.add(h); }); }catch(e){ /* bağlam ek bilgidir */ }
+  return {hayvanIdSet:hayvanIdSet,gunIdSet:new Set(),aktif:true};
+}
+/**
+ * N4-F3 H1: kart kararının hayvan kümesi — R5 (b) aynası (aktif OVSYNC vakası olan hayvanlar),
+ * SQL `_ovsync_gorev_mu`. loadTasks/loadDash IDB vakalarıyla kurar; Ovsync ekranı açılmasa da dolu.
+ * @param {Array} vakalar IDB cases satırları.
+ * @returns {Set} Kurulan küme (globalThis._ovsyncKartHayvanlar).
+ */
+function _ovsyncKartHayvanKur(vakalar){
+  const s=new Set();
+  (Array.isArray(vakalar)?vakalar:[]).forEach(c=>{ if(c&&c.status==='active'&&c.protocol_family==='OVSYNC'&&c.animal_id!=null) s.add(c.animal_id); });
+  globalThis._ovsyncKartHayvanlar=s;
+  return s;
+}
+/**
+ * F8 kart kararı: bayrak kapalıysa ya da görev Ovsync değilse null (eski
+ * `_erteleBtnHtml` yolu; UB4 oraya bağlar). Ovsync görevinde düzenle
+ * bağlantısı döner. Bozuk açıklama UA1'in hata bildirimiyle false'a düşer
+ * (sessiz değil), karar yine eski yoldur (fail-closed).
+ * @param {Object} t Görev satırı {gorev_tipi, hayvan_id, aciklama}.
+ * @param {Object} k {hayvanIdSet, gunIdSet, hata?, aktif?}.
+ * @returns {string|null} Düzenle HTML'i ya da null (eski yol).
+ */
+function _ovsyncTrenKartErteleHtml(t, k){
+  const kk=k&&typeof k==='object'?k:{};
+  if(kk.aktif!==true) return null;
+  if(typeof ovsyncTrenGorevMu!=='function'||typeof ovsyncDuzenleLinkHtml!=='function') return null;
+  let ovsync=false;
+  try{ ovsync=ovsyncTrenGorevMu(t,kk); }catch(e){ ovsync=false; }
+  return ovsync?ovsyncDuzenleLinkHtml(t):null;
+}
+/**
+ * F15 kart bağlaması (N4-F2 B2: HER data-eylem kol alır; inline onclick
+ * yok): UA1 `data-ovt-aksiyon` düğmeleri + toptan/ertele modal çipleri
+ * (`[data-n]`) + SECIM radyoları (`.ovs-radyo[data-case][data-secim]`) tek
+ * delegated dinleyicide. BASTAN/DUZENLE korunur. TOPTAN/N/SECIM/ONAYLA →
+ * toptan akışı; ERTELE/ERTELE_ONAYLA → tekil ertele akışı; SONRAKI_TREN →
+ * p_gun=1 (hedef sunucuda); PG48 → tai_hedef toast'u. Bilinmeyen aksiyon
+ * yutulmaz (false).
+ * @param {Event} ev Tıklama olayı.
+ * @returns {boolean} Tüketildiyse true.
+ */
+function _ovsyncTrenAksiyonTikla(ev){
+  const t=ev&&ev.target;
+  const yakala=(sec)=>t&&typeof t.closest==='function'?t.closest(sec):null;
+  const el=yakala('[data-ovt-aksiyon]');
+  // Modal çipleri / SECIM radyoları: data-ovt-aksiyon taşımaz, ayrı yakalanır.
+  // typeof kapıları: bu akışlar yüklenmemiş ctx'te (UB3 surgical) eski
+  // "yutulmaz" davranışı korunur.
+  const cip=el?null:yakala('[data-n]');
+  if(cip){
+    const ccip=cip.dataset||{};
+    const n=ccip.n!=null?ccip.n:(typeof cip.getAttribute==='function'?cip.getAttribute('data-n'):null);
+    if(typeof _ovsyncErteleOku==='function'&&_ovsyncErteleOku()){
+      try{ if(typeof ovsyncErteleN==='function') ovsyncErteleN(n); }catch(e){}
+      return true;
+    }
+    if(typeof _ovsyncToptanOku==='function'&&_ovsyncToptanOku()){
+      try{ if(typeof ovsyncToptanN==='function') ovsyncToptanN(n).catch(()=>{}); }catch(e){}
+      return true;
+    }
+    return false;
+  }
+  const radyo=el?null:yakala('.ovs-radyo[data-case]');
+  if(radyo){
+    if(typeof _ovsyncToptanOku!=='function'||typeof ovsyncToptanSecim!=='function') return false;
+    const dr=radyo.dataset||{};
+    const cid=dr.case!=null?dr.case:(typeof radyo.getAttribute==='function'?radyo.getAttribute('data-case'):null);
+    const sec=dr.secim!=null?dr.secim:(typeof radyo.getAttribute==='function'?radyo.getAttribute('data-secim'):null);
+    if(_ovsyncToptanOku()&&ovsyncToptanSecim(cid,sec)) return true;
+    return false;
+  }
+  if(!el) return false;
+  const ds=el.dataset||{};
+  const attr=(a)=>typeof el.getAttribute==='function'?el.getAttribute(a):null;
+  const aksiyon=ds.ovtAksiyon!=null?ds.ovtAksiyon:attr('data-ovt-aksiyon');
+  const hid=ds.hayvan!=null?ds.hayvan:attr('data-hayvan');
+  const cid=ds.case!=null?ds.case:attr('data-case');
+  const atesle=(fn,...a)=>{ try{ fn(...a).catch(()=>{}); }catch(e){} return true; };
+  if(aksiyon==='TOPTAN'){
+    if(typeof ovsyncToptanAc!=='function') return false;
+    const tarih=ds.tarih!=null?ds.tarih:attr('data-tarih');
+    if(tarih==null||tarih==='') return false;
+    return atesle(ovsyncToptanAc,tarih);
+  }
+  if(aksiyon==='ONAYLA'){
+    if(typeof ovsyncToptanOnayla!=='function'||typeof _ovsyncToptanOku!=='function'||!_ovsyncToptanOku()) return false;
+    return atesle(ovsyncToptanOnayla);
+  }
+  if(aksiyon==='ERTELE_ONAYLA'){
+    if(typeof ovsyncErteleOnayla!=='function'||typeof _ovsyncErteleOku!=='function'||!_ovsyncErteleOku()) return false;
+    return atesle(ovsyncErteleOnayla);
+  }
+  if(aksiyon==='VAZGEC'){
+    if(typeof _ovsyncModalKapat!=='function') return false;
+    if(typeof _ovsyncToptanOku==='function'&&_ovsyncToptanOku()){ _ovsyncModalKapat('ovt-toptan-bs'); return true; }
+    if(typeof _ovsyncErteleOku==='function'&&_ovsyncErteleOku()){ _ovsyncModalKapat('ovt-ertele-bs'); return true; }
+    if(typeof _ovsyncAyarOku==='function'&&_ovsyncAyarOku()){ _ovsyncModalKapat('ovt-ayar-bs'); return true; }
+    return false;
+  }
+  if(aksiyon==='ERTELE'){
+    if(typeof _ovsyncErteleAc!=='function'||hid==null||hid==='') return false;
+    return atesle(_ovsyncErteleAc,hid,cid);
+  }
+  if(aksiyon==='SONRAKI_TREN'){
+    if(typeof ovsyncSonrakiTren!=='function'||hid==null||hid==='') return false;
+    return atesle(ovsyncSonrakiTren,hid);
+  }
+  if(aksiyon==='PG48'){
+    if(typeof ovsyncPg48!=='function'||cid==null||cid==='') return false;
+    return atesle(ovsyncPg48,cid);
+  }
+  if(aksiyon==='AYAR'){
+    if(typeof ovsyncAyarAc!=='function') return false;
+    return atesle(ovsyncAyarAc);
+  }
+  if(aksiyon==='AYAR_TAKVIM'){
+    if(typeof ovsyncAyarCapaSec!=='function'||typeof _ovsyncAyarOku!=='function'||!_ovsyncAyarOku()) return false;
+    try{ ovsyncAyarCapaSec(); }catch(e){}
+    return true;
+  }
+  if(aksiyon==='AYAR_ACIK'||aksiyon==='AYAR_KAPALI'){
+    if(typeof ovsyncAyarSecim!=='function'||typeof _ovsyncAyarOku!=='function'||!_ovsyncAyarOku()) return false;
+    try{ ovsyncAyarSecim(aksiyon==='AYAR_ACIK'); }catch(e){}
+    return true;
+  }
+  if(aksiyon==='AYAR_ONIZLE'){
+    if(typeof ovsyncAyarOnizle!=='function'||typeof _ovsyncAyarOku!=='function'||!_ovsyncAyarOku()) return false;
+    return atesle(ovsyncAyarOnizle);
+  }
+  if(aksiyon==='AYAR_KAYDET'){
+    if(typeof ovsyncAyarKaydet!=='function'||typeof _ovsyncAyarOku!=='function'||!_ovsyncAyarOku()) return false;
+    return atesle(ovsyncAyarKaydet);
+  }
+  if(aksiyon==='BASTAN'){
+    if((cid==null||cid==='')||typeof _ovsyncBastanBaslatAkisi!=='function') return false;
+    return atesle(_ovsyncBastanBaslatAkisi,cid);
+  }
+  if(aksiyon!=='DUZENLE') return false;
+  if(typeof ovsyncEkranindaDuzenle==='function') ovsyncEkranindaDuzenle(ds.hayvan!=null?ds.hayvan:null);
+  return true;
+}
+/**
+ * N4-F4 B1: "Ovsync ekranında düzenle →" tıklaması capture fazında yakalanır; görev
+ * kartının satır içi onclick'ine (görev alt sayfası) sızmaz, varsayılan engellenir.
+ * @param {Event} ev Tıklama olayı.
+ * @returns {boolean} Tüketildiyse true.
+ */
+function _ovsyncDuzenleYakala(ev){
+  const t=ev&&ev.target;
+  const el=t&&typeof t.closest==='function'?t.closest('[data-ovt-aksiyon="DUZENLE"]'):null;
+  if(!el) return false;
+  ev.stopPropagation();
+  if(typeof ev.preventDefault==='function') ev.preventDefault();
+  return _ovsyncTrenAksiyonTikla(ev);
+}
+/**
+ * N4-F4 B1: Ovsync ekranı çizildikten sonra _ovsyncOdakHayvan'ı TÜKETİR: hayvanın kartına
+ * kaydırır, kart başlığını kısa süre yazı rengiyle vurgular (zemin yok), değişkeni temizler.
+ * @param {Element} kok #ovsync-root.
+ * @returns {boolean} Kart bulunup kaydırıldıysa true.
+ */
+function _ovsyncOdakTuket(kok){
+  const w=typeof window!=='undefined'?window:null;
+  if(!w||w._ovsyncOdakHayvan==null||w._ovsyncOdakHayvan==='') return false;
+  const id=String(w._ovsyncOdakHayvan);
+  w._ovsyncOdakHayvan=null;
+  const kartlar=kok&&typeof kok.querySelectorAll==='function'?Array.from(kok.querySelectorAll('[data-ovs-hayvan]')):[];
+  const kart=kartlar.find(k=>k.getAttribute('data-ovs-hayvan')===id)||null;
+  if(!kart){ console.warn('Ovsync odak: hayvan kartı ekranda yok ('+id+')'); return false; }
+  if(typeof kart.scrollIntoView==='function') kart.scrollIntoView({block:'center'});
+  const bas=kart.querySelector('.ovs-kupe, .ovs-v b')||kart;
+  bas.classList.add('ovs-odak');
+  if(typeof setTimeout==='function') setTimeout(()=>bas.classList.remove('ovs-odak'),2500);
+  return true;
+}
+if(typeof window!=='undefined'&&window&&!window._ovtAksiyonBaglandi
+  &&typeof document!=='undefined'&&document&&typeof document.addEventListener==='function'){
+  window._ovtAksiyonBaglandi=true;
+  document.addEventListener('click',_ovsyncDuzenleYakala,true);
+  document.addEventListener('click',_ovsyncTrenAksiyonTikla);
+}
+// ═══ OVSYNC TRENİ V2 + BASTAN EYLEMİ (UB4: PLAN UB2-V2 + F11 + BOŞLUK-4 sonrası) ═══
+/**
+ * V2 tren sorusu: kapalıysa 'TREN' (eski yol, ek RPC YOK); açıksa ovsyncTrenSor.
+ * @param {string} hayvanId Hayvan id.
+ * @param {Function} [acModalOverride] Test kancası (üretimde _ovsyncK8ModalAc).
+ * @returns {Promise<'TREN'|'BAGIMSIZ'|null>} null = başlatma yapılmaz.
+ * @tablo protokol_ayar (okuma)
+ */
+async function _ovsyncBaslatSecimi(hayvanId, acModalOverride){
+  if(typeof ovsyncTrenAktif!=='function'||typeof ovsyncTrenSor!=='function') return 'TREN';
+  let ayarlar=null;
+  try{ ayarlar=(typeof getData==='function')?await getData('protokol_ayar'):null; }
+  catch(e){ ayarlar=null; }
+  if(!ovsyncTrenAktif(ayarlar)) return 'TREN';
+  const acModal=(typeof acModalOverride==='function')?acModalOverride
+    :((typeof _ovsyncK8ModalAc==='function')?_ovsyncK8ModalAc:null);
+  if(!acModal) return 'TREN';
+  const cevrimici=(typeof _ertelemeOnline==='function')?_ertelemeOnline():true;
+  const uyari=(typeof toast==='function')?toast:function(){};
+  const sor=await ovsyncTrenSor({hayvanId:hayvanId==null?null:hayvanId, online:cevrimici, rpc:rpc, toast:uyari, acModal:acModal, aktif:true});
+  return !sor?null:(sor.secim==='BAGIMSIZ'?'BAGIMSIZ':'TREN');
+}
+/**
+ * N4-F1 G7/G9 tren sorusu: bayrak kapalı/çekirdek yok/modal yok → {soru:false}
+ * (eski yol birebir, ek RPC YOK); açıkken ovsyncTrenSor çekirdeği (R4 modalsız,
+ * Vazgeç/çevrimdışı → null). Devam bağlamında hayvan id taşınmaz (G7 null).
+ * @param {string|null} hayvanId Hayvan id (yoksa null).
+ * @param {Function} [acModalOverride] Test kancası (üretimde _ovsyncK8ModalAc).
+ * @returns {Promise<{soru:boolean, vazgecti?:boolean, bagimsiz?:boolean}>}
+ * @tablo protokol_ayar (okuma)
+ */
+async function _ovsyncG7G9Sor(hayvanId, acModalOverride){
+  if(typeof ovsyncTrenAktif!=='function'||typeof ovsyncTrenSor!=='function') return {soru:false};
+  let ayarlar=null;
+  try{ ayarlar=(typeof getData==='function')?await getData('protokol_ayar'):null; }
+  catch(e){ ayarlar=null; }
+  let acik=false;
+  try{ acik=ovsyncTrenAktif(ayarlar); }catch(e){ acik=false; }
+  if(!acik) return {soru:false};
+  const acModal=(typeof acModalOverride==='function')?acModalOverride
+    :((typeof _ovsyncK8ModalAc==='function')?_ovsyncK8ModalAc:null);
+  if(!acModal||typeof rpc!=='function') return {soru:false};
+  const cevrimici=(typeof _ertelemeOnline==='function')?_ertelemeOnline():true;
+  const uyari=(typeof toast==='function')?toast:function(){};
+  let sor=null;
+  try{ sor=await ovsyncTrenSor({hayvanId:(hayvanId==null?null:hayvanId), online:cevrimici, rpc:rpc, toast:uyari, acModal:acModal, aktif:true}); }catch(e){ sor=null; }
+  if(!sor) return {soru:true, vazgecti:true};
+  return {soru:true, bagimsiz:sor.secim==='BAGIMSIZ'};
+}
+/**
+ * K8 soru sheet'i: modal gövdesi + [data-secim] (ön seçim TREN). Her kapanış çözer.
+ * @param {string} html Yedek gövde.
+ * @param {Object} onizleme ovsync_tren_onizle dönüşü.
+ * @returns {Promise<'TREN'|'BAGIMSIZ'|null>} Seçim (Vazgeç/kapanma → null).
+ * @olay click
+ */
+function _ovsyncK8ModalAc(html, onizleme){
+  return new Promise((resolve)=>{
+    const st={secim:'TREN', kutu:null};
+    const bitir=(s)=>{ try{ if(st.kutu) st.kutu.remove(); }catch(e){} resolve(s); };
+    try{
+      if(typeof document==='undefined'||!document||typeof document.createElement!=='function'){ resolve(null); return; }
+      const o=onizleme&&typeof onizleme==='object'?onizleme:{};
+      const govde=(typeof _ovsyncK8ModalHtml==='function')?_ovsyncK8ModalHtml(o):String(html||'');
+      let kutu=document.getElementById('ovt-k8-bs');
+      if(kutu) kutu.remove();
+      kutu=document.createElement('div');
+      kutu.id='ovt-k8-bs';
+      kutu.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+      st.kutu=kutu;
+      kutu.onclick=(e)=>{ if(e.target===kutu) bitir(null); };
+      kutu.innerHTML='<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">'+govde+'</div>';
+      const isaretle=(sec)=>{
+        st.secim=sec;
+        Array.prototype.forEach.call(kutu.querySelectorAll('[data-secim]'),(el)=>{
+          const acik=el.getAttribute('data-secim')===sec;
+          el.setAttribute('aria-checked',acik?'true':'false');
+          const rad=el.querySelector('.ovs-radyo');
+          if(rad&&rad.classList) rad.classList.toggle('on',!!acik);
+        });
+      };
+      Array.prototype.forEach.call(kutu.querySelectorAll('[data-secim]'),(el)=>{
+        el.addEventListener('click',()=>isaretle(el.getAttribute('data-secim')));
+      });
+      Array.prototype.forEach.call(kutu.querySelectorAll('[data-ovt-aksiyon]'),(el)=>{
+        el.addEventListener('click',()=>{
+          const a=el.getAttribute('data-ovt-aksiyon');
+          if(a==='VAZGEC') bitir(null);
+          else if(a==='BASLAT') bitir(st.secim);
+        });
+      });
+      document.body.appendChild(kutu);
+    }catch(e){ bitir(null); }
+  });
+}
+/**
+ * BASTAN eylemi (BOŞLUK-4 sonrası): bastan_baslat → hedef_tarih/basladi toast.
+ * Hata → hata-metni toast'u. K11 sheet'inde bastan_tren_gunu YOK.
+ * @param {string} caseId Vaka id.
+ * @returns {Promise<boolean>} Toast atıldıysa true.
+ */
+async function _ovsyncBastanBaslatAkisi(caseId){
+  if(caseId==null||caseId==='') return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-bastan')) return false;
+  const cagir=(typeof apiOvsyncTren==='function')?apiOvsyncTren
+    :((typeof rpc==='function')?((n,p)=>rpc(n,p)):null);
+  if(!cagir) return false;
+  let s=null;
+  try{ s=await cagir('ovsync_bastan_baslat',{p_case_id:caseId}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  const r=s&&typeof s==='object'?s:{};
+  // Metin tek kaynak: forms.js _ovsyncBastanSonucMetni (UB2 pinli sözler).
+  const metin=(typeof _ovsyncBastanSonucMetni==='function')
+    ?_ovsyncBastanSonucMetni(r,(typeof bugun==='function')?bugun():undefined):'Baştan başlatıldı.';
+  if(typeof toast==='function') toast(metin);
+  try{
+    if(typeof updateTaskBadge==='function') updateTaskBadge();
+    if(typeof loadTasks==='function') loadTasks((typeof _curTaskFilter!=='undefined'&&_curTaskFilter)?_curTaskFilter:'today');
+    if(typeof loadDash==='function') loadDash();
+  }catch(e){}
+  return true;
+}
+// ═══ OVSYNC TRENİ TOPLU + TEKİL EYLEM AKIŞLARI (N4-F2 B2: PLAN UB3 :514-520) ═══
+// TOPTAN: ovsyncToptanAc → onizle → modal (N 1..7 + SECIM) → ONAYLA → ertele.
+// ERTELE/SONRAKI_TREN/PG48: kart düğmesi → ilgili RPC → sonuç toast'u.
+// Yazma sonrası _ovsyncTrenYenile (invalidate + ekran). Çevrimdışı düğme
+// çizilmez (başlık/satır online kapısı); girişler guard'lı. Inline onclick
+// YOK — tüm tıklamalar _ovsyncTrenAksiyonTikla'ya düşer.
+/**
+ * Tren yazma/salt-okuma çağrısı: apiOvsyncTren varsa o (invalidate eder),
+ * yoksa düz rpc. test stub'u (rpc) ikisine de uyar.
+ * @param {string} rpcAd RPC adı.
+ * @param {Object} params p_* parametreleri.
+ * @returns {Promise<Object>} RPC dönüşü.
+ */
+async function _ovsyncTrenCagir(rpcAd, params){
+  const cagir=(typeof apiOvsyncTren==='function')?apiOvsyncTren
+    :((typeof rpc==='function')?((n,p)=>rpc(n,p)):null);
+  if(!cagir) throw new Error('İnternet yok');
+  return await cagir(rpcAd, params);
+}
+/**
+ * Toptan modal durumu (window üstünde: extract ctx'lerde de erişilir).
+ * @returns {Object|null} {tarih, n, secimler, plan} ya da null.
+ */
+function _ovsyncToptanOku(){
+  try{
+    const st=(typeof window!=='undefined'&&window)?window._ovsyncToptan:null;
+    return (st&&typeof st==='object')?st:null;
+  }catch(e){ return null; }
+}
+/**
+ * Tekil ertele modal durumu (window üstünde).
+ * @returns {Object|null} {hayvan_id, n, maks} ya da null.
+ */
+function _ovsyncErteleOku(){
+  try{
+    const st=(typeof window!=='undefined'&&window)?window._ovsyncErtele:null;
+    return (st&&typeof st==='object')?st:null;
+  }catch(e){ return null; }
+}
+/**
+ * Overlay içeriğini yazar (yoksa iskeleti kurar). Yükleniyor satırı için
+ * html'e başlık taşınır; kart stili tek yerden.
+ * @param {string} id Overlay id ('ovt-toptan-bs' / 'ovt-ertele-bs').
+ * @param {string} html İç HTML.
+ * @returns {void}
+ */
+function _ovsyncModalYaz(id, html){
+  try{
+    if(typeof document==='undefined'||!document||typeof document.createElement!=='function') return;
+    let kutu=document.getElementById(id);
+    if(kutu) kutu.remove();
+    kutu=document.createElement('div');
+    kutu.id=id;
+    kutu.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+    if(document.body&&typeof document.body.appendChild==='function') document.body.appendChild(kutu);
+    kutu.innerHTML='<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;box-sizing:border-box;max-height:88vh;overflow:auto">'+String(html)+'</div>';
+  }catch(e){}
+}
+/**
+ * Overlay'i kapatır + ilgili durumu sıfırlar.
+ * @param {string} id Overlay id.
+ * @returns {void}
+ */
+function _ovsyncModalKapat(id){
+  try{
+    if(typeof document!=='undefined'&&document){
+      const kutu=document.getElementById(id);
+      if(kutu) kutu.remove();
+    }
+  }catch(e){}
+  try{
+    if(typeof window!=='undefined'&&window){
+      if(id==='ovt-toptan-bs') window._ovsyncToptan=null;
+      if(id==='ovt-ertele-bs') window._ovsyncErtele=null;
+    }
+  }catch(e){}
+}
+/**
+ * TOPTAN girişi (tren başlığı düğmesi): N=1 önizlemesiyle modalı açar.
+ * Çevrimdışı → toast, modal YOK.
+ * @param {string} trenGunu X (ISO).
+ * @returns {Promise<boolean>} Modal açıldıysa true.
+ */
+async function ovsyncToptanAc(trenGunu){
+  const tarih=String(trenGunu==null?'':trenGunu).slice(0,10);
+  if(!tarih) return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-toptan')) return false;
+  const st={tarih:tarih,n:1,secimler:{},plan:null};
+  try{ if(typeof window!=='undefined'&&window) window._ovsyncToptan=st; }catch(e){}
+  _ovsyncModalYaz('ovt-toptan-bs', '<div class="m-title">🚆 Tren gününü ertele</div><div class="m-body">Yükleniyor…</div>');
+  let plan=null;
+  try{ plan=await _ovsyncTrenCagir('ovsync_tren_ertele_onizle',{p_tarih:tarih,p_n:1}); }
+  catch(e){
+    _ovsyncModalKapat('ovt-toptan-bs');
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  st.plan=(plan&&typeof plan==='object')?plan:null;
+  _ovsyncToptanGovdeYaz();
+  return true;
+}
+/**
+ * Toptan modal gövdesini durumdan çizer (plan + secimler + bugun).
+ * @returns {void}
+ */
+function _ovsyncToptanGovdeYaz(){
+  const st=_ovsyncToptanOku();
+  if(!st||!st.plan) return;
+  if(typeof _ovsyncToptanGovdeHtml!=='function'||typeof ovsyncToptanOnizlemeHtml!=='function') return;
+  const bg=(typeof bugun==='function')?bugun():'';
+  _ovsyncModalYaz('ovt-toptan-bs', _ovsyncToptanGovdeHtml(st.plan, st.secimler, bg));
+}
+/**
+ * Toptan N seçimi (çip): n değişir, secimler sıfırlanır, önizleme yenilenir.
+ * @param {number|string} n 1..7.
+ * @returns {Promise<boolean>} Önizleme yazıldıysa true.
+ */
+async function ovsyncToptanN(n){
+  const st=_ovsyncToptanOku();
+  if(!st) return false;
+  const gun=parseInt(n,10);
+  if(!isFinite(gun)||gun<1||gun>7) return false;
+  st.n=gun; st.secimler={};
+  _ovsyncModalYaz('ovt-toptan-bs', '<div class="m-title">🚆 Tren gününü ertele</div><div class="m-body">Yükleniyor…</div>');
+  try{ st.plan=await _ovsyncTrenCagir('ovsync_tren_ertele_onizle',{p_tarih:st.tarih,p_n:gun}); }
+  catch(e){
+    _ovsyncModalKapat('ovt-toptan-bs');
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  _ovsyncToptanGovdeYaz();
+  return true;
+}
+/**
+ * Toptan SECIM satırı (a/b radyosu): secimler'e yazılır, gövde yeniden
+ * çizilir (önizleme RPC'si YOK — plan değişmedi).
+ * @param {string} caseId Vaka id.
+ * @param {string} secim 'PG48'|'BASTAN'.
+ * @returns {boolean} Yazıldıysa true.
+ */
+function ovsyncToptanSecim(caseId, secim){
+  const st=_ovsyncToptanOku();
+  if(!st||caseId==null||caseId==='') return false;
+  if(secim!=='PG48'&&secim!=='BASTAN') return false;
+  st.secimler[String(caseId)]=secim;
+  _ovsyncToptanGovdeYaz();
+  return true;
+}
+/**
+ * Toptan DUSTU gövdesi: modal AÇIK kalır, düşen küpeler + sebep metni
+ * (ovsyncTrenHataMetni özyinelemeli çözer) görünür.
+ * @param {*} e RPC hatası.
+ * @returns {boolean} DUSTU ise true (gösterildi).
+ */
+function _ovsyncToptanDustuGoster(e){
+  const ham=String((e&&e.message)||e||'');
+  if(ham.indexOf('OVSYNC_TREN_ERTELE_DUSTU')===-1) return false;
+  const metin=(typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):ham;
+  const govde='<div class="m-title">🚆 Tren ertelenemedi</div><div class="m-body">'
+    +'<div style="font-size:.78rem;line-height:1.5;margin-bottom:12px">'+metin+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button class="btn btn-o" data-ovt-aksiyon="VAZGEC" style="flex:1;margin-top:0">Kapat</button></div>'
+    +'<div style="font-size:.66rem;color:var(--ink3);text-align:center;margin-top:8px">Hiçbir hayvan değişmedi.</div></div>';
+  _ovsyncModalYaz('ovt-toptan-bs', govde);
+  return true;
+}
+/**
+ * Toptan ONAYLA: onay kapalıysa RPC YOK (fail-closed); DUSTU'da modal açık
+ * kalır; başarıda sonuç metni (F5) + kapatma + tazeleme.
+ * @returns {Promise<boolean>} Başarıda true.
+ */
+async function ovsyncToptanOnayla(){
+  const st=_ovsyncToptanOku();
+  if(!st||!st.plan) return false;
+  if(typeof ovsyncToptanOnayAcikMi==='function'&&!ovsyncToptanOnayAcikMi(st.plan,st.secimler)) return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-toptan')) return false;
+  let s=null;
+  try{ s=await _ovsyncTrenCagir('ovsync_tren_ertele',{p_tarih:st.tarih,p_n:st.n,p_secimler:st.secimler}); }
+  catch(e){
+    if(_ovsyncToptanDustuGoster(e)) return false;
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  const r=s&&typeof s==='object'?s:{};
+  const metin=(typeof _ovsyncToptanSonucMetni==='function')
+    ?_ovsyncToptanSonucMetni(r):'Toptan erteleme kaydedildi.';
+  if(typeof toast==='function') toast(metin);
+  _ovsyncModalKapat('ovt-toptan-bs');
+  await _ovsyncTrenYenile();
+  return true;
+}
+/**
+ * Yazma sonrası tazeleme: takip cache'i bozulur + tren ekranı yeniden yüklenir
+ * (ovsync-root varsa; yoksa yalnız invalidate).
+ * @returns {Promise<void>}
+ */
+async function _ovsyncTrenYenile(){
+  try{ if(typeof _ovsyncTakipInvalidate==='function') _ovsyncTakipInvalidate(); }catch(e){}
+  try{
+    if(typeof loadOvsyncDash==='function'&&typeof document!=='undefined'&&document
+      &&typeof document.getElementById==='function'&&document.getElementById('ovsync-root')) await loadOvsyncDash();
+  }catch(e){}
+}
+/**
+ * ERTELE girişi (aşama-1 / bağımsız aşama-0 kart düğmesi): listele → üye
+ * (case_id öncelikli, hayvan_id yedek) → ovsyncTekErteleAraligi (F3) →
+ * N seçicili modal. Aralık yoksa fail-closed.
+ * @param {string} hayvanId Hayvan id.
+ * @param {string} caseId Vaka id (yoksa null).
+ * @returns {Promise<boolean>} Modal açıldıysa true.
+ */
+async function _ovsyncErteleAc(hayvanId, caseId){
+  if(hayvanId==null||hayvanId==='') return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-ertele')) return false;
+  let veri=null;
+  try{ veri=await _ovsyncTrenCagir('ovsync_tren_listele',{}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  if(!veri||veri.aktif!==true) return false;
+  let uye=null;
+  try{
+    const tum=[];
+    (Array.isArray(veri.trenler)?veri.trenler:[]).forEach((t)=>{ if(t&&Array.isArray(t.uyeler)) tum.push(...t.uyeler); });
+    if(Array.isArray(veri.bagimsizlar)) tum.push(...veri.bagimsizlar);
+    const hc=caseId==null?'':String(caseId);
+    const hh=String(hayvanId);
+    uye=tum.find((u)=>u&&typeof u==='object'&&hc&&u.case_id!=null&&String(u.case_id)===hc)
+      ||tum.find((u)=>u&&typeof u==='object'&&u.hayvan_id!=null&&String(u.hayvan_id)===hh)||null;
+  }catch(e){ uye=null; }
+  const aralik=(uye&&typeof ovsyncTekErteleAraligi==='function')?ovsyncTekErteleAraligi(uye):null;
+  if(!aralik||!isFinite(aralik.min)||!isFinite(aralik.max)||aralik.min<1||aralik.max<aralik.min){
+    if(typeof toast==='function') toast('Bu hayvanda erteleme seçeneği yok; baştan başlat önerilir.',true);
+    return false;
+  }
+  const st={hayvan_id:hayvanId,n:aralik.min,maks:aralik.max};
+  try{ if(typeof window!=='undefined'&&window) window._ovsyncErtele=st; }catch(e){}
+  _ovsyncErteleGovdeYaz();
+  return true;
+}
+/**
+ * Tekil ertele modal gövdesi (N çipleri + Ertele/Vazgeç; inline onclick YOK).
+ * @returns {void}
+ */
+function _ovsyncErteleGovdeYaz(){
+  const st=_ovsyncErteleOku();
+  if(!st) return;
+  let cip='';
+  for(let i=1;i<=st.maks;i++) cip+='<button class="ovs-cip'+(i===st.n?' on':'')+'" data-n="'+i+'">+'+i+'</button>';
+  const govde='<div class="m-title">🚆 Ertele — en çok +'+st.maks+' gün</div><div class="m-body">'
+    +'<div style="font-size:.76rem;color:var(--ink3);margin-bottom:10px">Kaç gün ertelensin?</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+cip+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button class="btn btn-o" data-ovt-aksiyon="VAZGEC" style="flex:1;margin-top:0">Vazgeç</button>'
+    +'<button class="btn btn-g" data-ovt-aksiyon="ERTELE_ONAYLA" style="flex:1">Ertele</button></div></div>';
+  _ovsyncModalYaz('ovt-ertele-bs', govde);
+}
+/**
+ * Tekil ertele N seçimi (çip): durum güncellenir, gövde yeniden çizilir.
+ * @param {number|string} n Gün sayısı.
+ * @returns {boolean} Yazıldıysa true.
+ */
+function ovsyncErteleN(n){
+  const st=_ovsyncErteleOku();
+  if(!st) return false;
+  const gun=parseInt(n,10);
+  if(!isFinite(gun)||gun<1||gun>st.maks) return false;
+  st.n=gun;
+  _ovsyncErteleGovdeYaz();
+  return true;
+}
+/**
+ * Tekil ertele onayı: ovsync_hayvan_ertele → yeni_tarih toast'u + tazeleme.
+ * Hata → toast, modal açık kalır.
+ * @returns {Promise<boolean>} Başarıda true.
+ */
+async function ovsyncErteleOnayla(){
+  const st=_ovsyncErteleOku();
+  if(!st||st.hayvan_id==null||st.hayvan_id==='') return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-ertele')) return false;
+  let s=null;
+  try{ s=await _ovsyncTrenCagir('ovsync_hayvan_ertele',{p_hayvan_id:st.hayvan_id,p_gun:st.n}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  const r=s&&typeof s==='object'?s:{};
+  const metin=(typeof _ovsyncErteleSonucMetni==='function')
+    ?_ovsyncErteleSonucMetni(r):'Erteleme kaydedildi.';
+  if(typeof toast==='function') toast(metin);
+  _ovsyncModalKapat('ovt-ertele-bs');
+  await _ovsyncTrenYenile();
+  return true;
+}
+/**
+ * SONRAKI_TREN girişi (trende aşama-0): p_gun=1 taşınır, hedefi sunucu
+ * hesaplar (PLAN D6); sonuç yeni_tarih toast'unda.
+ * @param {string} hayvanId Hayvan id.
+ * @returns {Promise<boolean>} Başarıda true.
+ */
+async function ovsyncSonrakiTren(hayvanId){
+  if(hayvanId==null||hayvanId==='') return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-sonraki')) return false;
+  let s=null;
+  try{ s=await _ovsyncTrenCagir('ovsync_hayvan_ertele',{p_hayvan_id:hayvanId,p_gun:1}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  const r=s&&typeof s==='object'?s:{};
+  const metin=(typeof _ovsyncErteleSonucMetni==='function')
+    ?_ovsyncErteleSonucMetni(r):'Erteleme kaydedildi.';
+  if(typeof toast==='function') toast(metin);
+  await _ovsyncTrenYenile();
+  return true;
+}
+/**
+ * PG48 girişi (aşama-2 kart düğmesi): ovsync_pg48_tohumla → tai_hedef
+ * toast'u (BOŞLUK-1 sonrası kısım) + tazeleme.
+ * @param {string} caseId Vaka id.
+ * @returns {Promise<boolean>} Başarıda true.
+ */
+async function ovsyncPg48(caseId){
+  if(caseId==null||caseId==='') return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-pg48')) return false;
+  let s=null;
+  try{ s=await _ovsyncTrenCagir('ovsync_pg48_tohumla',{p_case_id:caseId}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  const r=s&&typeof s==='object'?s:{};
+  const metin=(typeof _ovsyncErteleSonucMetni==='function')
+    ?_ovsyncErteleSonucMetni(r):'Erteleme kaydedildi.';
+  if(typeof toast==='function') toast(metin);
+  await _ovsyncTrenYenile();
+  return true;
+}
+// ═══ OVSYNC TRENİ AYAR PANELİ (N4-F2 Parca3: PLAN UB3 :517-518, mockup 06) ═══
+// Ekran üstü satır ("Tren ayarı ›") → modal: aktif anahtarı + çapa tarihi +
+// Önizle (yeniden_hedefle kuru) → Kaydet (ayar_guncelle). Çevrimdışı satır
+// çizilmez; girişler guard'lı. Inline onclick YOK — tüm tıklamalar
+// _ovsyncTrenAksiyonTikla'ya düşer.
+/**
+ * Ayar modal durumu (window üstünde: extract ctx'lerde de erişilir).
+ * @returns {Object|null} {aktif, capa, onceki, onizleme, oneCekme, pgTol} ya da null.
+ */
+function _ovsyncAyarOku(){
+  try{
+    const st=(typeof window!=='undefined'&&window)?window._ovsyncAyar:null;
+    return (st&&typeof st==='object')?st:null;
+  }catch(e){ return null; }
+}
+/**
+ * Çapa haftanın günü: tam ad ("Cuma"). Geçersizse ''.
+ * @param {string} iso 'YYYY-MM-DD'.
+ * @returns {string} Gün adı ya da ''.
+ */
+function _ovsyncAyarHaftaGunu(iso){
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
+  if(!m) return '';
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  if(d.getUTCMonth()!==+m[2]-1||d.getUTCDate()!==+m[3]) return '';
+  return ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][d.getUTCDay()];
+}
+/**
+ * Tren ayarı satırı (mockup 06 üst satır): "🚆 Ovsync treni: açık · her
+ * Perşembe" + "Tren ayarı ›" düğmesi. Çevrimdışı ya da tren kapalıysa ''.
+ * @param {Object} trenVeri ovsync_tren_listele dönüşü.
+ * @param {boolean} online Çevrimiçi mi.
+ * @returns {string} Satır HTML'i ya da ''.
+ */
+function _ovsyncAyarSatirHtml(trenVeri, online){
+  if(online!==true) return '';
+  if(!trenVeri||typeof trenVeri!=='object'||trenVeri.aktif!==true) return '';
+  const gun=_ovsyncAyarHaftaGunu(trenVeri.capa);
+  return '<div class="ovs-ayar-satir"><span>🚆 Ovsync treni: <b>açık</b>'
+    +(gun?' · her <b>'+esc(gun)+'</b>':'')+'</span>'
+    +'<button class="ovs-tren-ertele" data-ovt-aksiyon="AYAR">Tren ayarı ›</button></div>';
+}
+/**
+ * Tarih girdisini okur (date input varsa o, yoksa durumdaki çapa).
+ * @param {Object} st Ayar durumu.
+ * @returns {string} 'YYYY-MM-DD' ya da durum çapası.
+ */
+function _ovsyncAyarCapaOku(st){
+  try{
+    if(typeof document!=='undefined'&&document&&typeof document.getElementById==='function'){
+      const giris=document.getElementById('ovt-ayar-capa');
+      const ham=giris&&(typeof giris.value==='string'?giris.value:(typeof giris.getAttribute==='function'?giris.getAttribute('value'):null));
+      if(/^\d{4}-\d{2}-\d{2}/.test(String(ham||''))) return String(ham).slice(0,10);
+    }
+  }catch(e){}
+  return st?st.capa:'';
+}
+/**
+ * Kuru önizleme özeti: taşınır satırlar (küpe + eski → yeni), kural-yok
+ * satırları ("kural günü bulunamadı — dokunulmaz"), belirsiz aşama küpeleri.
+ * @param {Object} oniz ovsync_tren_yeniden_hedefle dönüşü.
+ * @returns {string} Özet HTML'i.
+ */
+function _ovsyncAyarOzetHtml(oniz){
+  const o=oniz&&typeof oniz==='object'?oniz:{};
+  const ad=(typeof _ovsyncK8GunAd==='function')?_ovsyncK8GunAd:(x)=>String(x==null?'':x);
+  const gorevler=Array.isArray(o.gorevler)?o.gorevler:[];
+  const tasinir=gorevler.filter((g)=>g&&g.durum==='TASINIR');
+  const kuralsiz=gorevler.filter((g)=>g&&g.durum==='KURAL_YOK');
+  let h='';
+  tasinir.forEach((g)=>{
+    const kupe=g.kupe_no!=null&&String(g.kupe_no)!==''?String(g.kupe_no):String(g.hayvan_id==null?'':g.hayvan_id);
+    h+='<div class="ovs-on-satir"><div class="ovs-on-ust"><span><span class="ovs-on-kupe">'+esc(kupe)+'</span>'
+      +' <span class="ovs-on-asama">başlatma görevi</span></span><span class="ovs-on-sonuc ovs-kayar">'
+      +esc(ad(g.eski)+' → '+ad(g.yeni))+'</span></div></div>';
+  });
+  kuralsiz.forEach((g)=>{
+    const kupe=g.kupe_no!=null&&String(g.kupe_no)!==''?String(g.kupe_no):String(g.hayvan_id==null?'':g.hayvan_id);
+    h+='<div class="ovs-on-satir"><div class="ovs-on-ust"><span><span class="ovs-on-kupe">'+esc(kupe)+'</span>'
+      +' <span class="ovs-on-asama">başlatma görevi</span></span><span class="ovs-on-sonuc ovs-bastan">'
+      +'kural günü bulunamadı — dokunulmaz</span></div></div>';
+  });
+  const belirsiz=Array.isArray(o.belirsiz_asama)?o.belirsiz_asama:[];
+  const kupeler=belirsiz.map((b)=>b&&(b.kupe_no!=null&&String(b.kupe_no)!=='')?String(b.kupe_no):null).filter(Boolean);
+  if(kupeler.length){
+    h+='<div class="ovs-bilgi-satir">'+esc('Aşama belirsiz ('+kupeler.length+'): '+kupeler.slice(0,6).join(', ')
+      +' — baştan başlat önerilir.')+'</div>';
+  }
+  if(!h) return '<div class="ovs-bilgi-satir">Kaydedince değişecek görev yok.</div>';
+  return '<div class="ovs-bilgi-satir">'+esc(tasinir.length+' görev yeniden hedeflenecek.')+'</div>'+h
+    +'<div class="ovs-bilgi-satir" style="color:var(--ink3)">Başlamış Ovsync\'ler ve bağımsızlar değişmez.</div>';
+}
+/**
+ * AYAR girişi (tren üst satırı): listele → çapa + genel ayarlarla modalı açar.
+ * Çevrimdışı → toast, modal YOK.
+ * @returns {Promise<boolean>} Modal açıldıysa true.
+ */
+async function ovsyncAyarAc(){
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-ayar')) return false;
+  let veri=null;
+  try{ veri=await _ovsyncTrenCagir('ovsync_tren_listele',{}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  if(!veri||veri.aktif!==true) return false;
+  const capa=String(veri.capa||'').slice(0,10);
+  let oneCekme=null, pgTol=null;
+  try{
+    if(typeof getData==='function'){
+      const ayarlar=await getData('protokol_ayar');
+      const satirlar=Array.isArray(ayarlar)?ayarlar:[];
+      const bul=(k)=>satirlar.find((a)=>a&&a.anahtar===k);
+      const oc=bul('ovsync_tren_one_cekme_gun'), pt=bul('ovsync_pg_erteleme_tolerans_gun');
+      if(oc&&isFinite(+oc.deger)) oneCekme=+oc.deger;
+      if(pt&&isFinite(+pt.deger)) pgTol=+pt.deger;
+    }
+  }catch(e){}
+  const st={aktif:true,capa:capa,onceki:capa,onizleme:null,oneCekme:oneCekme,pgTol:pgTol};
+  try{ if(typeof window!=='undefined'&&window) window._ovsyncAyar=st; }catch(e){}
+  _ovsyncAyarGovdeYaz();
+  return true;
+}
+/**
+ * Ayar modal gövdesini durumdan çizer (anahtar + çapa + önizle + özet +
+ * Vazgeç/Kaydet; inline onclick YOK).
+ * @returns {void}
+ */
+function _ovsyncAyarGovdeYaz(){
+  const st=_ovsyncAyarOku();
+  if(!st) return;
+  const ad=(typeof _ovsyncK8GunAd==='function')?_ovsyncK8GunAd:(x)=>String(x==null?'':x);
+  const gun=_ovsyncAyarHaftaGunu(st.capa);
+  const tasinir=st.onizleme&&Array.isArray(st.onizleme.gorevler)
+    ?st.onizleme.gorevler.filter((g)=>g&&g.durum==='TASINIR').length:0;
+  let h='<div class="m-title">🚆 Tren ayarı</div><div class="m-body">';
+  h+='<div class="fg"><span class="flbl">Ovsync treni</span><div style="display:flex;gap:6px">'
+    +'<button class="ovs-cip'+(st.aktif?'':' on')+'" data-ovt-aksiyon="AYAR_KAPALI">Kapalı</button>'
+    +'<button class="ovs-cip'+(st.aktif?' on':'')+'" data-ovt-aksiyon="AYAR_ACIK">Açık</button></div>'
+    +'<div class="fhint" style="margin-top:5px">Kapalıyken Ovsync\'ler eski kurala göre (kural günü) başlar.</div></div>';
+  h+='<div class="fg"><span class="flbl">Tren günü</span>'
+    +'<div class="fi" style="font-weight:700"><input type="hidden" id="ovt-ayar-capa" value="'+esc(st.capa||'')+'">'
+    +'<button class="ovs-cip" data-ovt-aksiyon="AYAR_TAKVIM">📅 '+esc(ad(st.capa)||'Seç')+'</button>'
+    +(st.onceki?' &nbsp;<span style="color:var(--ink3);font-weight:500">(önceki: '+esc(ad(st.onceki))+')</span>':'')+'</div>'
+    +(gun?'<div class="fhint" style="margin-top:5px">Bu tarih ve her 7 gün sonrası tren günüdür → <b style="color:var(--ink)">her '+esc(gun)+'</b>.</div>':'')+'</div>';
+  if(st.oneCekme!=null&&st.pgTol!=null){
+    h+='<div style="font-size:.72rem;color:var(--ink3);margin:-2px 0 10px">Öne çekme en çok '+esc(String(st.oneCekme))
+      +' gün · PG toleransı '+esc(String(st.pgTol))+' gün (genel ayarlardan).</div>';
+  }
+  h+='<span class="flbl">Önizleme — kaydedince değişecekler</span>';
+  h+=st.onizleme?_ovsyncAyarOzetHtml(st.onizleme):'<div class="ovs-bilgi-satir">Önizlemeyi görmek için Önizle\'ye dokunun.</div>';
+  h+='<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button class="btn btn-o" data-ovt-aksiyon="AYAR_ONIZLE" style="flex:1;margin-top:0">Önizle</button>'
+    +'<button class="btn btn-o" data-ovt-aksiyon="VAZGEC" style="flex:1;margin-top:0">Vazgeç</button>'
+    +'<button class="btn btn-g" data-ovt-aksiyon="AYAR_KAYDET" style="flex:1">Kaydet'+(st.onizleme?' ('+tasinir+' görev)':'')+'</button></div></div>';
+  _ovsyncModalYaz('ovt-ayar-bs', h);
+}
+/**
+ * Ayar çapa seçimi: kanonik takvim (tekTarihTakvimAc, F4 kilidi — native
+ * date girişi YASAK) açılır; Onayla'da durum çapası güncellenir + yeniden
+ * çizilir. Çekirdek yoksa (cerrahi ctx) sessiz false.
+ * @returns {boolean} Takvim açıldıysa true.
+ */
+function ovsyncAyarCapaSec(){
+  const st=_ovsyncAyarOku();
+  if(!st||typeof tekTarihTakvimAc!=='function') return false;
+  try{
+    tekTarihTakvimAc({
+      baslik:'📅 Tren günü — Takvimden Seç',
+      deger:/^\d{4}-\d{2}-\d{2}/.test(String(st.capa||''))?String(st.capa).slice(0,10):undefined,
+      onSec:(iso)=>{
+        if(/^\d{4}-\d{2}-\d{2}/.test(String(iso||''))){ st.capa=String(iso).slice(0,10); _ovsyncAyarGovdeYaz(); }
+      },
+    });
+  }catch(e){ return false; }
+  return true;
+}
+/**
+ * Ayar anahtarı (Açık/Kapalı çipleri): duruma yazılır, gövde yeniden çizilir.
+ * @param {boolean} aktif Açık mı.
+ * @returns {boolean} Yazıldıysa true.
+ */
+function ovsyncAyarSecim(aktif){
+  const st=_ovsyncAyarOku();
+  if(!st) return false;
+  st.aktif=!!aktif;
+  _ovsyncAyarGovdeYaz();
+  return true;
+}
+/**
+ * AYAR Önizle: ovsync_tren_yeniden_hedefle(p_kuru:true, p_capa) → özet
+ * (taşınır sayısı + belirsiz aşama küpeleri) modalda. Hata → toast, modal açık.
+ * @returns {Promise<boolean>} Önizleme yazıldıysa true.
+ */
+async function ovsyncAyarOnizle(){
+  const st=_ovsyncAyarOku();
+  if(!st) return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-ayar')) return false;
+  const capa=_ovsyncAyarCapaOku(st);
+  let o=null;
+  try{ o=await _ovsyncTrenCagir('ovsync_tren_yeniden_hedefle',{p_kuru:true,p_capa:capa}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  st.capa=capa; st.onizleme=(o&&typeof o==='object')?o:null;
+  _ovsyncAyarGovdeYaz();
+  return true;
+}
+/**
+ * AYAR Kaydet: ovsync_tren_ayar_guncelle(p_aktif, p_capa) → toast + kapatma +
+ * tazeleme. Hata (OVSYNC_TREN_AYAR) → toast metni, modal AÇIK kalır.
+ * @returns {Promise<boolean>} Başarıda true.
+ */
+async function ovsyncAyarKaydet(){
+  const st=_ovsyncAyarOku();
+  if(!st) return false;
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('ovsync-ayar')) return false;
+  const capa=_ovsyncAyarCapaOku(st);
+  try{ await _ovsyncTrenCagir('ovsync_tren_ayar_guncelle',{p_aktif:!!st.aktif,p_capa:capa}); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  if(typeof toast==='function') toast('Tren ayarı kaydedildi.');
+  _ovsyncModalKapat('ovt-ayar-bs');
+  await _ovsyncTrenYenile();
+  return true;
 }
 /**
  * Dashboard'u yükler: aktif hayvanlar, hastalıklar, görevler, stok, doğumlar, gebelikler, aşı kayıtları ve diğer verileri getirir,
@@ -2096,6 +3271,7 @@ async function loadDash(){
     const _dtDiseases=await idbGetAll('diseases').catch(()=>[]);
     const _dtDById=Object.fromEntries(_dtDiseases.map(d=>[d.id,d.name||'']));
     const _dtCases=await idbGetAll('cases').catch(()=>[]);
+    if(typeof _ovsyncKartHayvanKur==='function') _ovsyncKartHayvanKur(_dtCases);   // N4-F3 H1: dash TAI kartı da aynı küme
     const _dtCById=Object.fromEntries(_dtCases.map(c=>[c.id,c]));
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
@@ -2140,9 +3316,16 @@ async function loadDash(){
         window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
         ovSayi = window.__ovsyncUyarilar.length;
       } catch(e) { console.warn('ovsync_baslat_uyarilari (rozet):', e.message); }
+      // UB5 (R15): doğum sonrası PG hatırlatma satırları rozete eklenir (5 = 2 + 3).
+      // Kapalı/boş yanıtta 0 → rozet birebir (sunucu karar verir, istemci türetmez).
+      let pgSayi = 0;
+      try { pgSayi = (await _ovsyncDogumPgSatirlari(rpc)).length; }
+      catch(e) { console.warn('dogum_sonrasi_pg_hatirlatma (rozet):', e.message); }
       // C4 (cila2): K8'in 3. rozet kaynağı (ovsync seans uyarıları) geri alındı —
       // sahip "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
-      const toplam = _rozetTopla(aktif.length, ovSayi);
+      // UB5 (R15): hatırlatma 3. kaynak olarak ÇAĞRI yerinde eklenir; C4-1 kilidi
+      // (_rozetTopla 2-arg) aynen korunur.
+      const toplam = _rozetTopla(aktif.length, ovSayi) + pgSayi;
       const bb = document.getElementById('bellbadge');
       if (bb) {
         bb.textContent = toplam > 99 ? '99+' : toplam;
@@ -2498,6 +3681,7 @@ async function loadTasks(f,btn,opts){
     // Üreme sekmesi diseases.category='Üreme' vakasının TEDAVI_SEANS/TEDAVI_GUN'lerini kapsar.
     const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
     const _allTaskCases=await idbGetAll('cases').catch(()=>[]);
+    if(typeof _ovsyncKartHayvanKur==='function') _ovsyncKartHayvanKur(_allTaskCases);   // N4-F3 H1: kart kararı Ovsync ekranından bağımsız
     const _allTaskDiseases=await idbGetAll('diseases').catch(()=>[]);
     const _caseById=Object.fromEntries(_allTaskCases.map(c=>[c.id,c]));
     const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
@@ -3561,7 +4745,7 @@ function _devamKizginlikGecis() {
  * MUAYENE_SONUC_GEREKLI → görev zaten kapandı, liste tazelenir; TOH_SONUCLU/TAKIP_KAPALI → ekran tazelenir.
  * @returns {Promise<void>}
  */
-async function _devamSeciciOnayla() {
+async function _devamSeciciOnayla(acModalOverride) {
   const st = window.__devamSecici;
   if (!st?.acik || st.isleniyor) return;
   if (st.secim === 'ERTALE' && saatYarimMi('devam-ertele-saat')) return;
@@ -3587,7 +4771,37 @@ async function _devamSeciciOnayla() {
     loadDash();
   };
   try {
-    await tohumlamaBosVeDevam(_devamRpcParams(st));
+    // N4-F1 G7: OVSYNC devamında bayrak açıksa önce soru (kapalı → eski yol;
+    // Vazgeç → RPC yok, seçici açık kalır).
+    let g7Bagimsiz = false, g7Sorulu = false;
+    if (st.secim === 'OVSYNC' && typeof _ovsyncG7G9Sor === 'function') {
+      let k = null;
+      try { k = await _ovsyncG7G9Sor(null, acModalOverride); } catch (e) { k = null; }
+      if (k && k.soru) {
+        if (k.vazgecti) {
+          st.isleniyor = false;
+          if (btn) { btn.disabled = false; btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun); }
+          return;
+        }
+        g7Sorulu = true; g7Bagimsiz = !!k.bagimsiz;
+      }
+    }
+    const r = await tohumlamaBosVeDevam(_devamRpcParams(st));
+    // N4-F1 G7 BAGIMSIZ: dönüşteki ovsync_gorev_id ile bağımsız başlat;
+    // hata → görev açık kalır, toast "Görev açıldı, başlatılamadı: …", throw yok.
+    if (g7Sorulu && g7Bagimsiz && r && r.ovsync_gorev_id) {
+      try {
+        await rpc('start_first_service_protocol', { p_gorev_id: r.ovsync_gorev_id, p_bagimsiz: true });
+      } catch (e) {
+        st.isleniyor = false;
+        if (btn) { btn.disabled = false; btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun); }
+        toast('Görev açıldı, başlatılamadı: ' + ((typeof ovsyncTrenHataMetni === 'function') ? ovsyncTrenHataMetni(e) : ((e && e.message) || e)), true);
+        _devamSeciciKapat();
+        await pullTables((typeof RPC_TABLES !== 'undefined' && RPC_TABLES.tohumlama_bos_ve_devam) || ['tohumlama', 'gorev_log']);
+        loadDash();
+        return;
+      }
+    }
     await sonra();
   } catch (e) {
     st.isleniyor = false;
@@ -4286,6 +5500,14 @@ function _ovsyncBaslatBtnHtml(t){
  */
 function _erteleBtnHtml(t){
   if(t.tamamlandi||t.iptal) return '';
+  // UB4: Ovsync görevinde Ertele YOK — Ovsync ekranı bağlantısı. Bağlam
+  // kurulamazsa/kapalıysa karar null döner, eski yol aynen çalışır.
+  try{
+    if(typeof _ovsyncTrenKartErteleHtml==='function'&&typeof _ovsyncKartKararBaglami==='function'){
+      const kk=_ovsyncKartKararBaglami(t);
+      if(kk){ const link=_ovsyncTrenKartErteleHtml(t,kk); if(link) return link; }
+    }
+  }catch(e){}
   // §18.17: GEBELIK_KONTROL/TAKIP_MUAYENE ertelemesi YALNIZ birleşik sonuç
   // ekranından (ERTALE) — genel ertele butonu bu tiplerde çizilmez (§10d #3).
   if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'||t.gorev_tipi==='HAYVAN_TAKIP_MUAYENE') return ''; // §20.6: genel Ertele yok
@@ -4321,13 +5543,24 @@ function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00'
  * @rpc start_first_service_protocol
  * @tablo cases (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
-async function ovsyncBaslat(gorevId, hayvanId){
+async function ovsyncBaslat(gorevId, hayvanId, acModalOverride){
   if(!gorevId) return;
+  // UB4 V2: soru — kapalıda 'TREN' (eski yol); BAGIMSIZ'de p_bagimsiz:true.
+  let bagimsiz=false;
+  if(typeof _ovsyncBaslatSecimi==='function'){
+    const secim=await _ovsyncBaslatSecimi(hayvanId, acModalOverride);
+    if(secim==null) return;
+    bagimsiz=(secim==='BAGIMSIZ');
+  }
   try{
+    const prm={p_gorev_id:gorevId};
+    if(bagimsiz) prm.p_bagimsiz=true;
     // P10: TAKIP_ACIK kapısı — takip açıkken başlatma onay sheet'ine düşer;
     // onaylı tekrar p_takip_onay=true ile (C2 tekil imza).
-    const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId}).catch(e=>{
-      const takipRetry=()=>rpc('start_first_service_protocol',{p_gorev_id:gorevId,p_takip_onay:true});
+    const r=await rpc('start_first_service_protocol',prm).catch(e=>{
+      const yPrm={p_gorev_id:gorevId,p_takip_onay:true};
+      if(bagimsiz) yPrm.p_bagimsiz=true;
+      const takipRetry=()=>rpc('start_first_service_protocol',yPrm);
       const kzP10=(getState('animals')||[]).find(a=>a&&a.id===hayvanId);
       if(typeof _takipAcikHata==='function'&&_takipAcikHata(e,takipRetry,{kupe:kzP10&&(kzP10.kupe_no||kzP10.devlet_kupe)||'',islem:'Ovsync başlatılsın mı?'})) return {_takipAcik:true};
       throw e;
@@ -4335,6 +5568,10 @@ async function ovsyncBaslat(gorevId, hayvanId){
     if(r&&r._takipAcik) return;
     if(r&&r.atlandi){ toast('Atlandı: '+r.atlandi,true); }
     else if(r&&r.zaten){ toast('Protokol zaten başlatılmış'); }
+    else if(r&&r.basladi===false){
+      // F11: tren yolunda taşınan görev — case_id YOKTUR (M4:185); metin forms.js'te.
+      toast((typeof _ovsyncBastanSonucMetni==='function')?_ovsyncBastanSonucMetni({basladi:false,yeniden_hedef:r.yeniden_hedef}):'Bu trene binemedi — başlamadı.',true);
+    }
     else{
       toast('✅ Ovsynch-56 başlatıldı — TAI hedefi '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
       // P10/B1: detaylı bildirim (izin varsa); panel kalıcı kaynak
@@ -4390,7 +5627,7 @@ async function ovsyncIptal(gorevId){
  * @returns {Promise<boolean|undefined>} Başarı durumunda true döner; kullanıcı onay vermezse ya da RPC hatası oluşursa döndürmez (undefined).
  * @rpc protokol_iptal
  */
-async function _protokolIptalAkisi(vaka){
+async function _protokolIptalAkisi(vaka, acModalOverride){
   let acikGun=0, acikSeans=0;
   try{
     acikGun=(await idbGetAll('treatment_days')).filter(td=>td.case_id===vaka.id&&!td.tamamlandi).length;
@@ -4398,6 +5635,27 @@ async function _protokolIptalAkisi(vaka){
   }catch(e){}
   if(!confirm(`Protokol vakası iptal edilsin mi?\n\nKapanacak: ${acikGun} açık tedavi günü, ${acikSeans} uygulanmamış seans.\nKullanılmayan ilaçlar stoğa iade edilir.`)) return;
   const yeniden=confirm('Yeniden başlat görevi (OVSYNC_BASLAT) oluşturulsun mu?');
+  // N4-F1 G9: OVSYNC vakada bayrak açıksa yeniden başlat bastan_baslat yoludur
+  // (TREN → (case); BAGIMSIZ → (case, true)); Vazgeç → RPC yok. Kapalıysa eski yol.
+  // Eylem öncesi düğme/metin tarih göstermez (BOŞLUK-4); sonuç metni sonrası hedeftedir.
+  if(yeniden&&vaka&&vaka.protocol_family==='OVSYNC'&&typeof _ovsyncG7G9Sor==='function'){
+    let k=null;
+    try{ k=await _ovsyncG7G9Sor(vaka.animal_id!=null?vaka.animal_id:(vaka.hayvan_id!=null?vaka.hayvan_id:null), acModalOverride); }catch(e){ k=null; }
+    if(k&&k.soru){
+      if(k.vazgecti) return;
+      const p={p_case_id:vaka.id};
+      if(k.bagimsiz) p.p_bagimsiz=true;
+      const cagir=(typeof apiOvsyncTren==='function')?apiOvsyncTren:rpc;
+      try{
+        const b=await cagir('ovsync_bastan_baslat', p);
+        toast((typeof _ovsyncBastanSonucMetni==='function')?_ovsyncBastanSonucMetni(b, (typeof bugun==='function')?bugun():undefined):'Baştan başlatıldı.');
+      }catch(e){ toast('❌ '+((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):((typeof getUserMessage==='function')?getUserMessage(e):((e&&e.message)||e))), true); return; }
+      await pullTables(RPC_TABLES.ovsync_bastan_baslat).catch(()=>{});
+      updateTaskBadge(); loadTasks(_curTaskFilter||'today'); loadDash();
+      window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
+      return true;   // C-1: vaka detay yüzeyi başarıda modalı kapatabilsin
+    }
+  }
   try{
     const r=await rpc('protokol_iptal',{p_vaka_id:vaka.id,p_yeniden_baslat:!!yeniden,p_not:null});
     toast('✅ Protokol iptal edildi — '+(r.kapanan_gorev|0)+' görev, '+(r.kapanan_seans|0)+' seans kapandı'
@@ -5471,6 +6729,22 @@ function _ovsyncAktifBolmeHtml(satirlar){
   </div>`;
   return `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🔄 Aktif Ovsync (${liste.length})</div>${liste.map(satir).join('')}`;
 }
+/**
+ * UB5 (Faz 0/R15): doğum sonrası PG hatırlatma satırlarını okur ve önbelleğe
+ * yazar. Kapalı/boş/hatalı yanıtta [] → panel ve rozet birebir (sunucu karar
+ * verir; throw sızmaz, panelin eski sessiz-deseni).
+ * @param {Function} rpc (ad, params) → Promise<yanıt> (üretimde global rpc bağlanır).
+ * @returns {Promise<Array>} satirlar (yoksa []).
+ * @rpc dogum_sonrasi_pg_hatirlatma
+ */
+async function _ovsyncDogumPgSatirlari(rpc){
+  try{
+    const pg = await rpc('dogum_sonrasi_pg_hatirlatma', {});
+    const satirlar = (pg && Array.isArray(pg.satirlar)) ? pg.satirlar : [];
+    try{ if(typeof window!=='undefined') window.__dogumPgHatirlatma = satirlar; }catch(_e){}
+    return satirlar;
+  }catch(e){ console.warn('dogum_sonrasi_pg_hatirlatma:', (e&&e.message)||e); return []; }
+}
 async function _showProtokolEkran(){
   let data = window.__protokolUyarilar;
   if (!data || !data.length) {
@@ -5572,6 +6846,16 @@ async function _showProtokolEkran(){
   // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:
   // "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
   // Ovsync seansları Görevler listesinde normal görev satırları olarak görünür (1f01e8b hâli).
+  // UB5 (Faz 0/R15, mockup 7a): 💉 hatırlatma 🌱 bloğunun yanına ov-slotuna
+  // katlanır (🔄 deseni; C4-3 montaj kilidi `${ovHtml}...` aynen korunur).
+  // Kapalı/boş yanıtta '' → panel birebir (kopya fonksiyon yok).
+  try{
+    const pgSatirlar = await _ovsyncDogumPgSatirlari(rpc);
+    if(typeof dogumPgHatirlatmaHtml==='function'){
+      const pgHtml = dogumPgHatirlatmaHtml(pgSatirlar);
+      if (pgHtml) ovHtml = ovHtml + pgHtml;
+    }
+  }catch(e){ console.warn('dogum_sonrasi_pg_hatirlatma (panel):', e.message); }
   if (!data.length && !ovHtml && !ovsyncHtml) { toast('Protokol uyarısı yok'); return; }
 
   const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
@@ -13112,17 +14396,32 @@ function cdKaydirSheetHtml() {
  * Eğer sistem offline moddaydırsa veya aktif bir vaka yoksa işlemi iptal eder.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  */
-function cdKaydirAc() {
-  // E6 offline kapısı: sayfa açılmaz, RPC zaten çağrılmaz
-  if (_ertelemeOfflineGuard('kaydir')) return;
+async function cdKaydirAc() {
+  // N4-F2 K6: E6 kapısı en başta, eski sırayla (guard → _curCase).
+  // OVSYNC-aktif vaka muaf: onda çevrimdışı/listele-hata sheet'i (D3ii)
+  // guard SATIRINDAN SONRA açılır — OVSYNC çevrimdışı metni guard'ın
+  // içinde değil sonrasındadır. Bayrak kapalı / OVSYNC-dışı / inaktif
+  // yolda eski sıra birebir (çevrimdışında sheet açılmaz).
+  const _k6Vaka = (typeof _curCase !== 'undefined') ? _curCase : null;
+  const _k6Ovsync = !!(_k6Vaka && _k6Vaka.status === 'active' && _k6Vaka.protocol_family === 'OVSYNC');
+  if (!_k6Ovsync && _ertelemeOfflineGuard('kaydir')) return;
   if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  // N4-F1 D3(ii): bayrak açık + aktif OVSYNC vakada aşama dalları açılır;
+  // null dönerse eski sheet birebir (OVSYNC-dışı vaka / bayrak kapalı / F12).
+  let govdeHtml = null;
+  try { govdeHtml = await _ovsyncKaydirDaliAc(); } catch (e) { govdeHtml = null; }
+  if (govdeHtml == null) {
+    // E6 offline kapısı: sayfa açılmaz, RPC zaten çağrılmaz
+    if (_ertelemeOfflineGuard('kaydir')) return;
+    govdeHtml = cdKaydirSheetHtml();
+  }
   let box = document.getElementById('kaydir-modal');
   if (box) box.remove();
   box = document.createElement('div');
   box.id = 'kaydir-modal';
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
   box.onclick = e => { if (e.target === box) box.remove(); };
-  box.innerHTML = cdKaydirSheetHtml();
+  box.innerHTML = govdeHtml;
   document.body.appendChild(box);
 }
 
@@ -13212,6 +14511,145 @@ async function caseKalanGunleriKaydir(gun) {
     toast('❌ ' + _kaydirHataMesaj(e.message), true);
     if (ozelBtn) { ozelBtn.disabled = false; ozelBtn.textContent = 'Gün Kaydır'; }
   }
+}
+
+// ═══ N4-F1 Parça 3: D3(ii) OVSYNC vaka kaydırma aşama dalları ═══
+/**
+ * OVSYNC kaydırma sheet gövdesi (çevrimdışı → kaydır yok + bağlantı; 0 →
+ * sonraki tren; 1 → +N seçici; 2 → kaydır yok + (a)/(b); belirsiz/üye yok →
+ * yalnız baştan başlat). Eylem öncesi tarih YOK (F3/BOŞLUK-4).
+ * @param {Object|null} uye Tren üyesi (yoksa null).
+ * @param {boolean} online Çevrimdışı gövde ise false.
+ * @returns {string} Sheet gövde HTML'i.
+ */
+function _ovsyncKaydirSheetHtml(uye, online){
+  var satir=' style="display:flex;gap:8px;margin-bottom:12px"';
+  var birincil=' style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer"';
+  var bilgi=' style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin-bottom:12px"';
+  var bastan='<button onclick="cdKaydirOvsyncBastan()"'+birincil+'>Baştan başlat</button>';
+  var pg=(uye&&uye.asama===1&&uye.pg_pay!=null)?Number(uye.pg_pay):null;
+  var maks=(pg!=null&&isFinite(pg)&&pg>=1)?Math.floor(pg):0, sec='';
+  for(var i=1;i<=maks;i++) sec+='<option value="'+i+'">+'+i+'</option>';
+  var pg48=(uye&&uye.asama===2&&(typeof _ovsyncPg48SatirHtml==='function'))?_ovsyncPg48SatirHtml(uye):'';
+  var govde='';
+  if(online!==true) govde='<div'+bilgi+'>İnternet yok — Ovsync vakası çevrimiçi kaydırılır</div><div'+satir+'><button onclick="cdKaydirOvsyncDuzenle()" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Ovsync ekranında düzenle →</button></div>';
+  else if(uye&&uye.asama===0) govde='<div'+bilgi+'>Başlamadı — hayvan sonraki trene aktarılır.</div><div'+satir+'><button onclick="_ovsyncKaydirErtele(1)"'+birincil+'>Sonraki trene aktar</button></div>';
+  else if(maks>0) govde='<div'+bilgi+'>PG\'yi ertele · en çok +'+maks+' gün</div><div'+satir+'><select id="kaydir-ovsync-n" data-maks="'+maks+'" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1rem;background:var(--card);color:var(--ink);text-align:center">'+sec+'</select><button onclick="_ovsyncKaydirErtele()" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Gün Ertele</button></div>';
+  else if(uye&&uye.asama===2) govde='<div'+bilgi+'>PG yapıldı · erteleme yok</div>'+((pg48&&pg48.indexOf('≈')!==-1)?'<div style="margin-bottom:8px">'+pg48+'</div>':'')+'<div'+satir+'><button onclick="cdKaydirOvsyncPg48()"'+birincil+'>PG1 + 48 s\'te tohumla</button></div><div'+satir+'>'+bastan+'</div>';
+  else govde='<div'+bilgi+'>'+(!uye?'Üye bulunamadı — baştan başlat önerilir.':(uye.asama===1?'Erteleme payı yok — baştan başlat önerilir.':'Aşama belirsiz — baştan başlat önerilir.'))+'</div><div'+satir+'>'+bastan+'</div>';
+  return '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box"><div style="font-weight:800;font-size:.9rem;margin-bottom:6px">🚆 Ovsync kaydırma</div>'+govde+'<div'+satir+'><button onclick="document.getElementById(\'kaydir-modal\').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button></div></div>';
+}
+/**
+ * D3(ii) dal kapısı: OVSYNC gövdesi üretir; OVSYNC-dışı/bayrak kapalı/
+ * sunucu kapalıda (F12) null (eski sheet); çevrimdışı/listele hatasında
+ * çevrimdışı gövde (eski kaydıra DÜŞMEZ). Üye vaka id ile eşleşir.
+ * @returns {Promise<string|null>} Sheet gövdesi ya da null.
+ * @rpc ovsync_tren_listele
+ * @tablo protokol_ayar (okuma)
+ */
+async function _ovsyncKaydirDaliAc(){
+  var vaka=(typeof _curCase!=='undefined')?_curCase:null;
+  if(!vaka||vaka.status!=='active'||vaka.protocol_family!=='OVSYNC') return null;
+  var acik=false;
+  try{ acik=(typeof ovsyncTrenAktif==='function')?ovsyncTrenAktif((typeof getData==='function')?await getData('protokol_ayar'):null):false; }catch(e){ acik=false; }
+  if(!acik) return null;
+  var cevrimici=(typeof _ertelemeOnline==='function')?_ertelemeOnline():true, uye=null;
+  if(cevrimici){
+    var veri=null;
+    try{ veri=(typeof rpc==='function')?await rpc('ovsync_tren_listele',{}):null; }catch(e){ veri=null; }
+    if(!veri||veri.ok!==true) cevrimici=false;
+    else if(veri.aktif===false) return null;
+    else{
+      try{
+        var hedef=String(vaka.id), tum=[];
+        (Array.isArray(veri.trenler)?veri.trenler:[]).forEach(function(t){ if(t&&Array.isArray(t.uyeler)) tum=tum.concat(t.uyeler); });
+        if(Array.isArray(veri.bagimsizlar)) tum=tum.concat(veri.bagimsizlar);
+        for(var k=0;k<tum.length;k++){ var u=tum[k]; if(u&&u.case_id!=null&&String(u.case_id)===hedef){ uye=u; break; } }
+      }catch(ee){ uye=null; }
+    }
+  }
+  if(typeof _ovsyncKaydirSheetHtml!=='function') return null;
+  return _ovsyncKaydirSheetHtml(uye,cevrimici);
+}
+/**
+ * OVSYNC yazma çağrısı: çevrimdışı kapısı + hata toast'u (sessiz yok) +
+ * başarı kuyruğu. apiOvsyncTren yoksa düz rpc denenir.
+ * @param {string} rpcAd Yazma RPC adı.
+ * @param {Object} params p_* parametreleri.
+ * @returns {Promise<boolean>} Başarıda true.
+ */
+async function _ovsyncKaydirCagir(rpcAd, params){
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('kaydir')) return false;
+  var cagir=(typeof apiOvsyncTren==='function')?apiOvsyncTren:((typeof rpc==='function')?((n,p)=>rpc(n,p)):null);
+  var s=null;
+  try{ s=cagir?await cagir(rpcAd,params):null; if(!s) throw new Error('İnternet yok'); }
+  catch(e){
+    if(typeof toast==='function') toast((typeof ovsyncTrenHataMetni==='function')?ovsyncTrenHataMetni(e):String((e&&e.message)||e),true);
+    return false;
+  }
+  await _ovsyncKaydirBasari(s);
+  return true;
+}
+/**
+ * OVSYNC başarısı: sonuç metni (F3 yeni_tarih / tai_hedef) + kapatma +
+ * tazeleme (eski kaydır sırası).
+ * @param {Object} sonuc RPC dönüşü.
+ * @param {boolean} [sessiz] True ise toast atılmaz.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülür.
+ * @tablo cases (tazeleme), treatment_days (tazeleme), treatment_day_uygulamalar (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), stok (tazeleme), stok_hareket (tazeleme), diseases (tazeleme), drugs (tazeleme), tedavi_sablonu (tazeleme), protokol_ayar (tazeleme), protokol_instance (tazeleme)
+ */
+async function _ovsyncKaydirBasari(sonuc, sessiz){
+  if(!sessiz&&typeof toast==='function') toast((typeof _ovsyncErteleSonucMetni==='function')?_ovsyncErteleSonucMetni(sonuc):'Erteleme kaydedildi.');
+  try{ document.getElementById('kaydir-modal')?.remove(); }catch(e){}
+  try{ if(typeof pullTables==='function') await pullTables(['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu','protokol_ayar','protokol_instance']); }catch(e){}
+  try{ var v=(typeof _curCase!=='undefined')?_curCase:null; if(v){ if(typeof renderCaseTimeline==='function') await renderCaseTimeline(v.id); if(typeof _updateKapatBtn==='function') _updateKapatBtn(v.id); } }catch(e){}
+}
+/**
+ * OVSYNC erteleme: sayı varsa doğrudan (0: p_gun, F3); yoksa +N seçiciden
+ * okur (1; üst sınır dışı değer RPC'ye ulaşmaz).
+ * @param {number} [gun] Gün sayısı (yoksa seçiciden okunur).
+ * @returns {Promise<void>} İşlem tamamlandığında çözülür.
+ */
+async function _ovsyncKaydirErtele(gun){
+  var v=(typeof _curCase!=='undefined')?_curCase:null;
+  var hid=v?(v.animal_id!=null?v.animal_id:(v.hayvan_id!=null?v.hayvan_id:null)):null;
+  if(hid==null||hid===''){ if(typeof toast==='function') toast('Hayvan bulunamadı',true); return; }
+  var n=parseInt(gun,10), maks=0;
+  if(gun==null){ try{ var el=document.getElementById('kaydir-ovsync-n'); if(el){ n=parseInt(el.value,10); if(el.getAttribute) maks=parseInt(el.getAttribute('data-maks'),10); } }catch(e){ n=NaN; } }
+  if(!isFinite(n)||n<1||(gun==null&&isFinite(maks)&&maks>0&&n>maks)){ if(typeof toast==='function') toast('Geçerli bir gün sayısı seçin',true); return; }
+  await _ovsyncKaydirCagir('ovsync_hayvan_ertele',{p_hayvan_id:hid,p_gun:n});
+}
+/**
+ * Aşama 2(a): PG1 + 48 s'te tohumla (sonuç metni tai_hedef'lidir).
+ * @returns {Promise<void>} İşlem tamamlandığında çözülür.
+ */
+async function cdKaydirOvsyncPg48(){
+  var v=(typeof _curCase!=='undefined')?_curCase:null, cid=v?v.id:null;
+  if(cid==null||cid===''){ if(typeof toast==='function') toast('Vaka bulunamadı',true); return; }
+  await _ovsyncKaydirCagir('ovsync_pg48_tohumla',{p_case_id:cid});
+}
+/**
+ * Aşama 2(b) + belirsiz: baştan başlat (BOŞLUK-4: öncesi tarihsiz, sonrası
+ * akış toast'unda); başarıda sheet kapanır + vaka tazelenir.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülür.
+ */
+async function cdKaydirOvsyncBastan(){
+  var v=(typeof _curCase!=='undefined')?_curCase:null, cid=v?v.id:null;
+  if(cid==null||cid===''){ if(typeof toast==='function') toast('Vaka bulunamadı',true); return; }
+  var ok=false;
+  try{ if(typeof _ovsyncBastanBaslatAkisi==='function') ok=await _ovsyncBastanBaslatAkisi(cid); }catch(e){ ok=false; }
+  if(!ok) return;
+  await _ovsyncKaydirBasari(null,true);
+}
+/**
+ * Çevrimdışı bağlantı: Ovsync ekranına (odaklı) geç + sheet'i kapat.
+ * @returns {void} Bir değer döndürmez.
+ */
+function cdKaydirOvsyncDuzenle(){
+  var hid=null;
+  try{ var v=(typeof _curCase!=='undefined')?_curCase:null; hid=v?(v.animal_id!=null?v.animal_id:(v.hayvan_id!=null?v.hayvan_id:null)):null; }catch(e){ hid=null; }
+  try{ if(typeof ovsyncEkranindaDuzenle==='function') ovsyncEkranindaDuzenle(hid); else if(typeof goTo==='function') goTo('ovsync'); }catch(e){}
+  try{ document.getElementById('kaydir-modal')?.remove(); }catch(e){}
 }
 
 /**
@@ -14115,14 +15553,30 @@ async function caseSablonListeRender(){
  * Verilen şablon ID'si için tedavi şablonunu uygular, planlı tohumlama görevlerini ekler,
  * ilgili tabloları günceller ve zaman çizelgesini yeniden render eder.
  * @param {string} sablonId Uygulanacak şablonun benzersiz kimlik numarası.
+ * @param {Function} [acModalOverride] Test kancası (üretimde _ovsyncK8ModalAc).
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc tedavi_sablon_tohumlama_gorev_ekle, tedavi_sablon_uygula
  * @tablo cases (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
-async function caseSablonUygula(sablonId){
+async function caseSablonUygula(sablonId, acModalOverride){
+  // N4-F2 q2: V5 erken dalı (V2/V3/V4/V6 deseni) — OVSYNC şablonda soru;
+  // TREN → tren günüyle devam, Vazgeç → RPC yok. Global sargı
+  // (_ovsyncV5KancaKur) kaldırıldı; helpers yoksa eski yol birebir.
+  // Sıra sargıyla aynı: soru baş kontrollerinden ÖNCE (V5'in offline
+  // kapısı yok — çevrimdışı soru çekirdeği 'İnternet yok' ile null döner).
+  let trenTarihi = null;
+  try{
+    if(typeof _ovsyncKancaDurumu==='function'
+      && await _ovsyncKancaDurumu({sablonId:sablonId})){
+      let sor=null;
+      try{ sor=await _ovsyncKancaSor(null, acModalOverride); }catch(e){ sor=null; }
+      if(!sor) return;
+      if(sor.secim==='TREN' && sor.tarih) trenTarihi = sor.tarih;
+    }
+  }catch(e){}
   if(!sablonId || !_curCase) return;
   if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const tarih = _cdSablonTarih;
+  const tarih = trenTarihi || _cdSablonTarih;
   if(!tarih){ toast('Şablonun ilk gününü seçin', true); return; }
   // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
   const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula',

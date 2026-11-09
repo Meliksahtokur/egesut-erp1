@@ -635,6 +635,76 @@ async function _ovsyncAileHastalikIdSet(){
     return _ovsyncAileHastalikIdleri(eslem, sablonlar);
   }catch(e){ console.warn('[ovsync-kisir] eşlem okunamadı — DB katmanı keser:', e); return new Set(); }
 }
+/** N4-F1 K8 elverişliliği: bayrak açık + (OVSYNC şablon | OVSYNC hastalığı); yoksa false. */
+async function _ovsyncKancaDurumu(secm){
+  try{
+    if(typeof ovsyncTrenAktif!=='function') return false;
+    let ayarlar = null;
+    try{ ayarlar = await idbGetAll('protokol_ayar'); }
+    catch(e){ ayarlar = (typeof getData==='function') ? await getData('protokol_ayar') : null; }
+    if(!ovsyncTrenAktif(ayarlar)) return false;
+  }catch(e){ return false; }
+  const o = (secm && typeof secm==='object') ? secm : {};
+  if(o.diseaseId){
+    try{ const ids = await _ovsyncAileHastalikIdSet(); if(ids && ids.has(o.diseaseId)) return true; }catch(e){}
+  }
+  if(o.sablonId){
+    try{
+      const sablonlar = await idbGetAll('tedavi_sablonu');
+      const s = (sablonlar||[]).find(x => x && String(x.id)===String(o.sablonId));
+      if(s && s.protokol_ailesi==='OVSYNC') return true;
+    }catch(e){}
+  }
+  return false;
+}
+/** N4-F1 K8 sorusu (V2 deseni): çekirdek + _ovsyncK8ModalAc; yoksa eski yol. null = vazgeç. */
+async function _ovsyncKancaSor(hayvanId, acModalOverride){
+  const sorFn = (typeof ovsyncTrenSor==='function') ? ovsyncTrenSor : null;
+  const acModal = (typeof acModalOverride==='function') ? acModalOverride
+    : ((typeof _ovsyncK8ModalAc==='function') ? _ovsyncK8ModalAc : null);
+  const rpcFn = (typeof rpc==='function') ? rpc : null;
+  if(!sorFn || !acModal || !rpcFn) return { secim: 'TREN', tarih: null };
+  const uyari = (typeof toast==='function') ? toast : function(){};
+  const cevrimici = (typeof navigator!=='undefined' && navigator) ? navigator.onLine===true : true;
+  return sorFn({ hayvanId: (hayvanId==null ? null : hayvanId), online: cevrimici, rpc: rpcFn, toast: uyari, acModal: acModal, aktif: true });
+}
+/** N4-F2 q2 uyumluluğu: üretim V5 yolu ui.js caseSablonUygula erken dalıdır.
+ * Bu sargı yalnız doğrudan-çağrı testleri için korunur (N4-F1 V5 davranışı:
+ * OVSYNC şablonda soru; TREN → çapa geçici tren günü, koş, geri yükle).
+ * @returns {Promise<*>} Özgün akışın sonucu (Vazgeç → undefined).
+ */
+async function _ovsyncV5Sargili(sablonId, orig, acModalOverride){
+  let soru = false;
+  try{ soru = await _ovsyncKancaDurumu({ sablonId: sablonId }); }catch(e){ soru = false; }
+  if(!soru) return orig(sablonId);
+  if(typeof navigator!=='undefined' && navigator && navigator.onLine!==true){
+    if(typeof toast==='function') toast('İnternet yok'); return;
+  }
+  let sor = null;
+  try{ sor = await _ovsyncKancaSor(null, acModalOverride); }catch(e){ sor = null; }
+  if(!sor) return;
+  if(sor.secim==='TREN' && sor.tarih){
+    const yedek = _cdSablonTarih;
+    try{ _cdSablonTarih = sor.tarih; return await orig(sablonId); }
+    finally{ _cdSablonTarih = yedek; }
+  }
+  return orig(sablonId);
+}
+/** N4-F2 q2 uyumluluk sargısı: üretim V5 yolu ui.js caseSablonUygula
+ * içindeki erken daldır (global yeniden atama YOK). Bu kurulum yalnız
+ * doğrudan-çağrı testleri için korunur; üretimde çağrılmaz.
+ * @returns {boolean} Sargı kurulduysa true.
+ */
+function _ovsyncV5KancaKur(acModalOverride){
+  try{
+    if(typeof caseSablonUygula!=='function' || caseSablonUygula._ovsyncV5) return false;
+    const orig = caseSablonUygula;
+    const sargili = function(sablonId){ return _ovsyncV5Sargili(sablonId, orig, acModalOverride); };
+    sargili._ovsyncV5 = true;
+    caseSablonUygula = sargili;
+    return true;
+  }catch(e){ return false; }
+}
 
 // diseases dropdown'u DB'den doldur
 // K6 — yarış-guard: doldurma çağrıları sıralanır; innerHTML'i yalnız EN SON
@@ -789,10 +859,18 @@ async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix
  * @rpc create_case, kizginlik_tedavi_baglanti_kur, tedavi_sablon_uygula
  * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
-async function submitCase(btn) {
-  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+async function submitCase(btn, acModalOverride) {
   const hid       = v('d-hid');
   const diseaseId = v('d-disease-id');
+  // N4-F2 K7: çevrimdışı kararı IDB okumasından ÖNCE snapshot'lanır —
+  // bayat/bozuk IDB çevrimdışı reddi değiştiremez (fail-closed). İleti ayrımı
+  // (Ovsync'e 'İnternet yok') aşağıdaki elverişlilik okumasını kullanır.
+  const cevrimdisi = !navigator.onLine;
+  // N4-F1 V3 elverişliliği (bayrak açık + Ovsync şablon/hastalık) — çevrimdışı
+  // toast dalı buna göre; bayrak kapalıysa aşağıdaki metin/yol birebir eski.
+  let ovsyncSoru = false;
+  try{ ovsyncSoru = await _ovsyncKancaDurumu({ sablonId: globalThis._seciliSablonId || null, diseaseId: diseaseId || null }); }catch(e){ ovsyncSoru = false; }
+  if (cevrimdisi) { toast(ovsyncSoru ? 'İnternet yok' : '⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!hid)       { toast('Hayvan seçilmedi', true); return; }
   if (!diseaseId) { toast('Hastalık seçilmedi', true); return; }
 
@@ -810,6 +888,15 @@ async function submitCase(btn) {
     if (kisirNeden) { toast(`⚠️ ${hayvan.kupe_no || hid}: ${kisirNeden}`, true); return; }
   }
 
+  // N4-F1 V3: elverişliyse create_case ÖNCESİ soru (kopya yok: ovsyncTrenSor);
+  // Vazgeç/hata → RPC yok, form açık kalır. TREN tarihi şablon çağrılarına taşınır.
+  let ovsyncTrenTarihi = null;
+  if (ovsyncSoru) {
+    let sor = null;
+    try{ sor = await _ovsyncKancaSor(hayvan.id, acModalOverride); }catch(e){ sor = null; }
+    if (!sor) return;
+    if (sor.secim === 'TREN' && sor.tarih) ovsyncTrenTarihi = sor.tarih;
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
   const kizginlikKayitId = globalThis._kizginlikTedaviId; // closeM m-disease işareti siler; kapanıştan önce oku
   try {
@@ -824,14 +911,14 @@ async function submitCase(btn) {
     if (sablonId && res?.case_id) {
       // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
       let r = null;
-      const cagri = async (onay, gerekce) => (r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null }));
+      const cagri = async (onay, gerekce) => (r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null, ...(ovsyncTrenTarihi ? { p_baslangic_tarihi: ovsyncTrenTarihi } : {}) }));
       try {
         await cagri(false, null);
         await _vakaSablonSonu(res.case_id, sablonId, r);
       } catch(e) {
         // Madde 2: PG reddinde return YOK — kapı ekranı açıldıysa akış kapanışa düşer.
         if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri, () => _vakaSablonOnaySonu(res.case_id, sablonId, r))) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
-        else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res.case_id, sablonId, x => { r = x; }); }
+        else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res.case_id, sablonId, x => { r = x; }, ovsyncTrenTarihi, acModalOverride); }
       }
     } else {
       toast('✅ Vaka açıldı');
@@ -879,14 +966,14 @@ async function submitCase(btn) {
       if (sablonId2 && res2?.case_id) {
         // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
         let r2 = null;
-        const cagri = async (onay, gerekce) => (r2 = await rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null }));
+        const cagri = async (onay, gerekce) => (r2 = await rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null, ...(ovsyncTrenTarihi ? { p_baslangic_tarihi: ovsyncTrenTarihi } : {}) }));
         try {
           await cagri(false, null);
           await _vakaSablonSonu(res2.case_id, sablonId2, r2);
         } catch (e3) {
           // Madde 2: PG reddinde return YOK — akış kapanışa düşer.
           if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri, () => _vakaSablonOnaySonu(res2.case_id, sablonId2, r2))) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
-          else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res2.case_id, sablonId2, x => { r2 = x; }); }
+          else { window.__pgKapiVazgec = _vakaPlanUygulanmadi; window.__pgKapiBosAta = _vakaBosAtaKanca(res2.case_id, sablonId2, x => { r2 = x; }, ovsyncTrenTarihi, acModalOverride); }
         }
         globalThis._seciliSablonId = null;
       } else {
@@ -942,9 +1029,27 @@ async function _vakaSablonOnaySonu(caseId, sablonId, r) {
  * Vaka Aç (submitCase) ve vaka detayı (ui.js caseSablonUygula, `baslangic` = planın ilk günü) kullanır.
  * @rpc tedavi_sablon_bos_ata_uygula
  */
-function _vakaBosAtaKanca(caseId, sablonId, yaz, baslangic) {
-  return async (tohumlamaId, gerekce) => yaz(await rpc('tedavi_sablon_bos_ata_uygula',
-    { p_case_id: caseId, p_sablon_id: sablonId, p_tohumlama_id: tohumlamaId, p_gerekce: gerekce, p_baslangic_tarihi: baslangic || null }));
+function _vakaBosAtaKanca(caseId, sablonId, yaz, baslangic, acModalOverride) {
+  return async (tohumlamaId, gerekce) => {
+    // N4-F1 V6: tarih kararsız + OVSYNC şablonsa soru; TREN → tren günü,
+    // Vazgeç → RPC yok. Kararlı tarih (V3/V5 zinciri) sorusuz taşınır.
+    // Çekirdek/modal yoksa eşzamanlı eski yol (çift-dokunuş zamanlaması korunur).
+    let tarih = baslangic || null;
+    const sorulabilir = typeof ovsyncTrenSor === 'function'
+      && (typeof acModalOverride === 'function' || typeof _ovsyncK8ModalAc === 'function');
+    if (!tarih && sorulabilir) {
+      let soru = false;
+      try{ soru = await _ovsyncKancaDurumu({ sablonId: sablonId }); }catch(e){ soru = false; }
+      if (soru) {
+        let sor = null;
+        try{ sor = await _ovsyncKancaSor(null, acModalOverride); }catch(e){ sor = null; }
+        if (!sor) return null;
+        if (sor.secim === 'TREN' && sor.tarih) tarih = sor.tarih;
+      }
+    }
+    return yaz(await rpc('tedavi_sablon_bos_ata_uygula',
+      { p_case_id: caseId, p_sablon_id: sablonId, p_tohumlama_id: tohumlamaId, p_gerekce: gerekce, p_baslangic_tarihi: tarih }));
+  };
 }
 
 /** PG kapısı onaysız kapandı (_pgKapiKapat): vaka durur, plan yazılmadı. */
@@ -3218,7 +3323,7 @@ function bcSonucBantlari(satirlar, opts){
  * @rpc vaka_toplu_ac
  * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
-async function submitBulkCase(btn){
+async function submitBulkCase(btn, acModalOverride){
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   let liste = globalThis._bcHayvanlar || [];
   if (!liste.length) { toast('⚠️ En az bir hayvan seçin', true); return; }
@@ -3249,10 +3354,20 @@ async function submitBulkCase(btn){
 
   // V1.2 — planlanan tedavi tarihi (boş → null = bugün); geçmiş tarih erken red
   // (sunucu da reddeder: 'Geçmiş tarih planlanamaz' — istemci aynası).
-  const tarih = bcTarihDeger() || null; // V2.3-W20: kanonik ISO (görüntü TR — asla gönderilmez)
+  let tarih = bcTarihDeger() || null; // V2.3-W20: kanonik ISO (görüntü TR — asla gönderilmez)
   if (tarih && bcGecmisPlanTarihiMi(tarih, bugun())) {
     toast('⚠️ Geçmiş tarih planlanamaz', true);
     return;
+  }
+  // N4-F1 V4: OVSYNC şablon (+manuel plansız) + bayrak açıksa soru;
+  // TREN p_tarih'i tren gününe çeker, Vazgeç RPC'siz döner.
+  let ovsyncSoruV4 = false;
+  try{ ovsyncSoruV4 = !manuelVar && await _ovsyncKancaDurumu({ sablonId: globalThis._bcSeciliSablonId || null }); }catch(e){ ovsyncSoruV4 = false; }
+  if (ovsyncSoruV4) {
+    let sor4 = null;
+    try{ sor4 = await _ovsyncKancaSor(null, acModalOverride); }catch(e){ sor4 = null; }
+    if (!sor4) return;
+    if (sor4.secim === 'TREN' && sor4.tarih) tarih = sor4.tarih;
   }
 
   // V1.2/V2 — tohumlama isteği: blok DAIMA görünür; kutu yalnız AKTİF modda
@@ -5311,6 +5426,11 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
     const res = await rpcSeansTamamla(seansId, uygulanmadi, null);
     if (res?._pgKapi) return;   // T3: PG kapı modalı açıldı — sahte başarı toast'u YOK (modal akışı yönetir)
     toast(uygulanmadi ? '↩ Yapılamadı işaretlendi, stok iade edildi' : '✓ Seans tamamlandı');
+    // UB4: seans dönüşünde ovsync_uyari varsa uyarı sheet'i (başarı toast'ı korunur).
+    try{
+      const uh = (typeof _ovsyncSeansUyariHtmli==='function') ? _ovsyncSeansUyariHtmli(res) : '';
+      if(uh && typeof _ovsyncUyariSheetAc==='function') _ovsyncUyariSheetAc(uh);
+    }catch(e){}
     await pullTables(['treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'treatment_days', 'gorev_log', 'cases']);
     // Açık görünümleri tazele
     if (_curCase) {
@@ -5633,6 +5753,53 @@ function _cokluKaydirBantiKapat(){
   if (el) el.remove();
   window._ckKaydirSonucEl = null;
 }
+/**
+ * Çoklu kaydırma bandı Ovsync eki (UB4, saf): atlanan Ovsync görevi yoksa ''.
+ * @param {Object} sonuc vaka_kalan_gunleri_kaydir_coklu dönüşü.
+ * @returns {string} UA1 not HTML'i ya da ''.
+ */
+function _ovsyncCokluBantEki(sonuc){
+  try{
+    if(typeof ovsyncCokluAtlananNot!=='function') return '';
+    return ovsyncCokluAtlananNot(sonuc)||'';
+  }catch(e){ return ''; }
+}
+/**
+ * Seans sonucu Ovsync uyarı HTML'i (UB4, saf): ovsync_uyari yoksa ''.
+ * @param {Object} res seans_tamamla dönüşü.
+ * @returns {string} UA1 sheet içeriği ya da ''.
+ */
+function _ovsyncSeansUyariHtmli(res){
+  try{
+    if(!res||!res.ovsync_uyari) return '';
+    if(typeof ovsyncGecTamamlamaUyariHtml!=='function') return '';
+    return ovsyncGecTamamlamaUyariHtml(res.ovsync_uyari)||'';
+  }catch(e){ return ''; }
+}
+/**
+ * Ovsync uyarı alt-sheet'i (UB4): içerik UA1'den; kutu-dışı ya da herhangi bir
+ * aksiyon tıklaması kapatır (BASTAN/DUZENLE ayrıca document-seviyesi delegated
+ * bağlamayla çalışır; olay kabarcığı silinen kutudan da hedefe ulaşır).
+ * @param {string} html Sheet içeriği.
+ * @returns {boolean} Açıldıysa true.
+ */
+function _ovsyncUyariSheetAc(html){
+  if(typeof document==='undefined'||!document||typeof document.createElement!=='function') return false;
+  try{
+    let kutu=document.getElementById('ovt-uyari-bs');
+    if(kutu) kutu.remove();
+    kutu=document.createElement('div');
+    kutu.id='ovt-uyari-bs';
+    kutu.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+    kutu.onclick=(e)=>{ if(e.target===kutu) kutu.remove(); };
+    kutu.innerHTML='<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">'+String(html||'')+'</div>';
+    Array.prototype.forEach.call(kutu.querySelectorAll('[data-ovt-aksiyon]'),(el)=>{
+      el.addEventListener('click',()=>{ try{ kutu.remove(); }catch(e){} });
+    });
+    document.body.appendChild(kutu);
+    return true;
+  }catch(e){ return false; }
+}
 
 // Onay çubuğu → diyaloğu: Set boşsa sessiz çıkış (çubuk 0 seçimde zaten gizli);
 // gün girişi tam sayı 1-31 değilse açıklayıcı toast + çıkış. Doğrulanmış gün
@@ -5712,7 +5879,10 @@ async function cokluKaydirOnayla(){
     // Bant ÖNCE basılır — buton ancak bant göründükten sonra serbest kalır.
     // I-4: vakalar kupe ile gösterilir (çözülemeyen → kısa-id fallback).
     const kupeHarita = await _ckCaseKupeHaritasi();
-    _cokluKaydirBantiGoster(_cokluKaydirBanti(sonuc, kupeHarita));
+    // UB4: Ovsync'ten atlanan görevler banda eklenir (yoksa '' → bant aynen).
+    let ovEk = '';
+    try{ ovEk = (typeof _ovsyncCokluBantEki==='function') ? _ovsyncCokluBantEki(sonuc) : ''; }catch(e){ ovEk=''; }
+    _cokluKaydirBantiGoster(_cokluKaydirBanti(sonuc, kupeHarita) + ovEk);
     await pullTables(tablolar).catch(console.warn);
     renderSafe();
     _cokluSecimTemizle();
@@ -5755,4 +5925,80 @@ function _ckKaydirClick(ev){
 if (!window._ckKaydirBaglandi) {
   window._ckKaydirBaglandi = true;
   document.addEventListener('click', _ckKaydirClick);
+}
+
+// ═══ OVSYNC TRENİ SONUÇ METİNLERİ (UB2: F3/F5/BOŞLUK-1/BOŞLUK-4/F11) ═══
+// Saf metin üreticiler (toast/textContent'e gider; HTML'e basılmaz). Eylem
+// bağlama (buton→RPC→toast) sonraki parçada; metin sözleşmesi burada pinlenir.
+/**
+ * TR kısa gün: "Per 3 Ara" (UTC aritmetiği; toISOString slice YOK).
+ * @param {string} iso 'YYYY-MM-DD'.
+ * @returns {string} Kısa gün adı + gün + ay; geçersizse ham girdi.
+ */
+function _ovsyncTrenTarihAd(iso){
+  const G=['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const A=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
+  if(!m) return String(iso==null?'':iso);
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  if(d.getUTCMonth()!==+m[2]-1||d.getUTCDate()!==+m[3]) return String(iso);
+  return G[d.getUTCDay()]+' '+d.getUTCDate()+' '+A[d.getUTCMonth()];
+}
+/**
+ * BOŞLUK-4 sonrası + F11: baştan başlat yanıtı metni. basladi:false dönüşünde
+ * case_id YOKTUR (sözleşme M4:185) — metin yalnız yeniden_hedefe dayanır.
+ * @param {Object} sonuc ovsync_bastan_baslat dönüşü {hedef_tarih, basladi, yeniden_hedef}.
+ * @param {string} [bugunIso] TR bugünü ("bugün başladı" dalı için).
+ * @returns {string} Toast/metin cümlesi.
+ */
+function _ovsyncBastanSonucMetni(sonuc, bugunIso){
+  const s=sonuc&&typeof sonuc==='object'?sonuc:{};
+  if(s.basladi===false){
+    if(s.yeniden_hedef) return _ovsyncTrenTarihAd(s.yeniden_hedef)+' trenine taşındı, başlamadı.';
+    return 'Bu trene binemedi — başlamadı.';
+  }
+  if(s.hedef_tarih){
+    if(bugunIso&&String(s.hedef_tarih).slice(0,10)===String(bugunIso)) return 'bugün başladı.';
+    return _ovsyncTrenTarihAd(s.hedef_tarih)+' treninde başlar.';
+  }
+  return 'Baştan başlatıldı.';
+}
+/**
+ * F3 + BOŞLUK-1 sonrası: ertele/pg48 yanıtı metni — yanıttaki tarih
+ * (yeni_tarih ya da uygulanan tai_hedef) söylenir; tarih yoksa genel metin.
+ * @param {Object} sonuc ovsync_hayvan_ertele / ovsync_pg48_tohumla dönüşü.
+ * @returns {string} Toast/metin cümlesi.
+ */
+function _ovsyncErteleSonucMetni(sonuc){
+  const s=sonuc&&typeof sonuc==='object'?sonuc:{};
+  if(s.tai_hedef) return 'PG1 + 48 s tohumlaması '+_ovsyncTrenTarihAd(s.tai_hedef)+' hedefine yazıldı.';
+  if(s.yeni_tarih) return _ovsyncTrenTarihAd(s.yeni_tarih)+' tarihine ertelendi.';
+  return 'Erteleme kaydedildi.';
+}
+/**
+ * F5: toptan erteleme sonucu metni — işlenen sayısı, iptal_tai adedi,
+ * basladi:false + yeniden_hedef ve ileri_vakalar görünür (sessiz başarı yok).
+ * @param {Object} sonuc ovsync_tren_ertele dönüşü {islenen[] (detay: {iptal_tai[], basladi, yeniden_hedef}), ileri_vakalar[]}.
+ * @returns {string} Toast/sonuç cümlesi.
+ */
+function _ovsyncToptanSonucMetni(sonuc){
+  const s=sonuc&&typeof sonuc==='object'?sonuc:{};
+  const isl=Array.isArray(s.islenen)?s.islenen.filter(Boolean):[];
+  const parca=[isl.length+' hayvan işlendi.'];
+  let iptal=0;
+  const yeniden=[];
+  isl.forEach((k)=>{
+    const d=k.detay&&typeof k.detay==='object'?k.detay:null;
+    if(!d) return;
+    if(Array.isArray(d.iptal_tai)) iptal+=d.iptal_tai.length;
+    if(d.basladi===false&&d.yeniden_hedef) yeniden.push(_ovsyncTrenTarihAd(d.yeniden_hedef));
+  });
+  if(iptal) parca.push(iptal+' tohumlama iptal edildi.');
+  if(yeniden.length) parca.push('Başlamayanlar '+yeniden.join(', ')+' trenine taşındı.');
+  const iv=Array.isArray(s.ileri_vakalar)?s.ileri_vakalar.filter(Boolean):[];
+  if(iv.length){
+    const kupeler=iv.map((v)=>v.kupe_no).filter((k)=>k!=null&&k!=='').map(String).join(', ');
+    parca.push(iv.length+' ileri vaka yeni ritme taşındı'+(kupeler?' ('+kupeler+')':'')+'.');
+  }
+  return parca.join(' ');
 }

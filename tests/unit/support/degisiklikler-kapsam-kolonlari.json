@@ -6,6 +6,8 @@
   "disease_id",
   "id",
   "notes",
+  "ovsync_bagimsiz",
+  "ovsync_tren",
   "plan_notu",
   "start_date",
   "status"

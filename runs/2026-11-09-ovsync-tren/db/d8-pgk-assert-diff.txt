@@ -1,0 +1,82 @@
+# git diff 4e46386 -- supabase/tests/ovsync_pg_kabul.sql (D8, root ruling SORU-4 A5–A7) — üretim: 2026-11-09T12:13:34Z
+diff --git a/supabase/tests/ovsync_pg_kabul.sql b/supabase/tests/ovsync_pg_kabul.sql
+index 26041aa..8a24b08 100644
+--- a/supabase/tests/ovsync_pg_kabul.sql
++++ b/supabase/tests/ovsync_pg_kabul.sql
+@@ -292,8 +292,10 @@ DO $t$ BEGIN PERFORM pg_temp.kb_bolum('0'); END $t$;  -- D8a
+ DO $t$
+ DECLARE
+   v_def text; v_a text := pg_temp.kb_hayvan(); v_r jsonb; v_d date := CURRENT_DATE - 45;
+-  v_gunler int[]; v_n int; v_tara jsonb;
++  v_gunler int[]; v_n int; v_tara jsonb; v_a2 text; v_a3 text;
+ BEGIN
++  -- root ruling 2026-11-09 SORU-4 A5: spec §4 Faz 0 — dal (i) dogum_sonrasi_pg_gorev_aktif=1 → arşiv kodu (15 görev, PG 2/25/39)
++  UPDATE public.protokol_ayar SET deger = 1 WHERE anahtar = 'dogum_sonrasi_pg_gorev_aktif';
+   v_def := pg_get_functiondef('public.dogum_kaydet(text,date,text,text,text,numeric,text,text)'::regprocedure);
+   PERFORM pg_temp.kb_ok(v_def !~ 'p_tarih \+ 11\M', 'S10', 'dogum_kaydet gövdesi "+ 11" içermez', 'içeriyor');
+   PERFORM pg_temp.kb_ok(v_def ~ 'p_tarih \+ 39\M' AND v_def LIKE '%39. Gün PG (Presynch-14 senkron)%', 'S10', 'gövde "+ 39" ve tarayıcı açıklamasını içerir', 'yok');
+@@ -316,6 +318,18 @@ BEGIN
+   SELECT count(*) INTO v_n FROM jsonb_array_elements(v_tara) e
+    WHERE e->>'hayvan_id' = v_a AND e->>'etken_kod' = 'PG' AND e->>'durum' = 'eksik';
+   PERFORM pg_temp.kb_ok(v_n = 0, 'S10', 'protokol_eksik_tara eksik PG raporlamaz', v_n::text);
++  -- root ruling 2026-11-09 SORU-4 A5: spec §4 Faz 0 — dal (ii) =0 → 12 görev, PG görevi yok; d2 hatırlatma olarak görünür (RL-13; d39 yok)
++  UPDATE public.protokol_ayar SET deger = 0 WHERE anahtar = 'dogum_sonrasi_pg_gorev_aktif';
++  v_a2 := pg_temp.kb_hayvan();
++  v_r := public.dogum_kaydet(v_a2, v_d, pg_temp.kb_id('KBY'));
++  SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id = v_a2 AND etken_kod = 'PG';
++  PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND (v_r->>'gorev_sayisi')::int = 12 AND v_n = 0, 'S10',
++                        'aktif=0: ok, gorev_sayisi 12, PG görevi yok', format('%s pg=%s', v_r, v_n));
++  v_a3 := pg_temp.kb_hayvan();
++  PERFORM public.dogum_kaydet(v_a3, (now() AT TIME ZONE 'Europe/Istanbul')::date - 2, pg_temp.kb_id('KBY'));
++  PERFORM pg_temp.kb_ok(EXISTS (SELECT 1 FROM jsonb_array_elements(public.dogum_sonrasi_pg_hatirlatma()->'satirlar') s
++                                 WHERE s->>'hayvan_id' = v_a3 AND (s->>'gun')::int = 2), 'S10',
++                        'aktif=0: doğumu bugün−2 olan anne hatırlatma satırında gun=2', public.dogum_sonrasi_pg_hatirlatma()::text);
+   RAISE NOTICE 'PASS S10: gövde D39 (D11 yok); yeni doğum PG 2/25/39; tarayıcı eksik PG raporlamaz; bayrak 0 rota yok (MK5)';
+ END $t$;
+ 
+@@ -1503,7 +1517,8 @@ DECLARE
+     'public.hizli_uygulama_geri_al(uuid)', 'public.close_case_with_remaining(uuid,text)',
+     'public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)', 'public.tedavi_sablon_uygula(uuid,uuid,date,boolean,text)',
+     'public.dogum_kaydet(text,date,text,text,text,numeric,text,text)', 'public.tohumlama_abort(text,text,date)',
+-    'public.start_first_service_protocol(uuid,boolean)', 'public.ilk_tohumlama_zamanlayici(boolean)',
++    -- root ruling 2026-11-09 SORU-4 A6: D4 (20261110100004:37-38) + p_bagimsiz
++    'public.start_first_service_protocol(uuid,boolean,boolean)', 'public.ilk_tohumlama_zamanlayici(boolean)',
+     'public.ovsync_baslat_uyarilari()'];
+   v_ic text[] := ARRAY[
+     'public._ovsync_pg_aktif()', 'public._trg_drug_classes_sistem_koru()', 'public._tohumlama_pencere(timestamptz)',
+@@ -1511,8 +1526,9 @@ DECLARE
+     'public._pg_olay_isle(text,text,text,text,uuid,timestamptz,jsonb,text)', 'public._pg_kapi_detay(jsonb,text,text)',
+     'public._vaka_kapat(uuid,text,text,jsonb)', 'public._ilk_tohumlama_rota_kur(text,date,text)',
+     'public._trg_uygulama_log_pg_geri_al()', 'public._son_tohumlama(text)',
+-    'public._ovsync_kural_tarihi(text)', 'public._ovsync_baslat_gorev_kur(text,date,text,date)',
+-    'public._acik_disi_ovsync_hedef(text)', 'public._acik_disi_gorev_kur(text)',
++    -- root ruling 2026-11-09 SORU-4 A6: D3 (20261110100003:37-38, :153-154) + p_hemen
++    'public._ovsync_kural_tarihi(text)', 'public._ovsync_baslat_gorev_kur(text,date,text,date,boolean)',
++    'public._acik_disi_ovsync_hedef(text)', 'public._acik_disi_gorev_kur(text,boolean)',
+     'public._ovsync_gecis_sk10()'];
+   v_f text; v_oid oid;
+ BEGIN
+@@ -1538,7 +1554,10 @@ BEGIN
+                              -- root ruling 2026-11-09 SORU-2 A4: genişleyen 5 imzanın eski hâli
+                              'public.hizli_uygulama(text,text,numeric,text,text,text,boolean,text,timestamptz)',
+                              'public.seans_tamamla(uuid,boolean,text,boolean,text)', 'public.bulk_ilac(text[],text,numeric,text,text[],text)',
+-                             'public.tedavi_sablon_uygula(uuid,uuid,date)', 'public.start_first_service_protocol(uuid)'] LOOP
++                             'public.tedavi_sablon_uygula(uuid,uuid,date)', 'public.start_first_service_protocol(uuid)',
++                             -- root ruling 2026-11-09 SORU-4 A6: D3/D4 DROP+CREATE ile genişleyen 3 imzanın eski hâli
++                             'public.start_first_service_protocol(uuid,boolean)', 'public._ovsync_baslat_gorev_kur(text,date,text,date)',
++                             'public._acik_disi_gorev_kur(text)'] LOOP
+     PERFORM pg_temp.kb_ok(to_regprocedure(v_f) IS NULL, 'ACL', v_f || ' DROP edildi', 'hâlâ var');
+   END LOOP;
+   -- S-9: abort_kaydet authenticated'a kapalı
+@@ -1681,8 +1700,9 @@ BEGIN
+   v_r := public.tohumlama_sonuc_bos(v_toh::text);
+   SELECT * INTO v_g FROM public.gorev_log WHERE hayvan_id = v_b AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+   PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_g.hedef_tarih = GREATEST(v_d + 51, (now() AT TIME ZONE 'Europe/Istanbul')::date)
+-                        AND v_g.kaynak = 'ACIK-DISI-' || v_b || '-' || (v_d + 51)::text,
+-    'R32-3/SK8', 'Boş sonucu → görev, hedef GREATEST(kural, bugün), kaynak ACIK-DISI-<hayvan>-<kural>', row_to_json(v_g)::text);
++                        -- root ruling 2026-11-09 SORU-4 A7: R10 (20261110100003 _acik_disi_gorev_kur) anahtar + son tohumlama id
++                        AND v_g.kaynak = 'ACIK-DISI-' || v_b || '-' || (v_d + 51)::text || '-' || v_toh::text,
++    'R32-3/SK8', 'Boş sonucu → görev, hedef GREATEST(kural, bugün), kaynak ACIK-DISI-<hayvan>-<kural>-<son tohumlama>', row_to_json(v_g)::text);
+   RAISE NOTICE 'PASS R32-3: Boş → açık dişi görevi (bekletilmez)';
+ END $t$;
+ 
