@@ -210,3 +210,6 @@ postgres-language-server.jsonc
 tools/stat-motor/.venv/
 tools/stat-motor/.pytest_cache/
 !tools/stat-motor/**/*.py
+
+# repo-standart INDEX.md yalnız yerel (public repo; sahip 2026-11-10)
+INDEX.md

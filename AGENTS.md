@@ -1,3 +1,4 @@
+Arama ve repo standardı RS: ~/tools-bank/.superset/lib/repo-standart/arama-kurali.md · ne nerede: ./INDEX.md
 # EgeSut ERP — Agent Entry Point
 
 Harness contract version: `1`

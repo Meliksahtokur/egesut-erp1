@@ -1,0 +1,8 @@
+# .repo-standart - `repo-standart kur` yazar
+ad=egesut-erp1
+denetle=
+zincir=
+indeks=zorunlu
+crumbs=egesut-erp1
+z1_ertele=hooksPath acmak tum canli egesut worktree kancalarini degistirir; .git/hooks/pre-commit 3. taraf shazam (yalniz main) ve .githooks/pre-push /root yolu bozuk - kanca birlesimi ayri is
+indeks_uyari_bitis=
