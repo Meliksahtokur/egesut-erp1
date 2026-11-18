@@ -1030,6 +1030,11 @@ body.dark .atolye-sayfa-baslik{color:var(--ink)}
         <div class="log-text"><div class="log-title">Değişiklikler</div><div class="log-sub">Tüm kayıt değişiklikleri, fark görünümü ve güvenli geri alma</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
+      <div data-action="open-cikanlar" class="log-btn" style="margin-top:2px">
+        <div class="log-ico" style="background:rgba(192,50,26,.12)">🚪</div>
+        <div class="log-text"><div class="log-title">Sürüden Çıkanlar</div><div class="log-sub">Ölü, satıldı, kesildi, kayıp hayvanlar</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
       <div id="stok-list-body" style="display:none"></div>
       <div class="sh" style="margin-top:6px"><span class="sh-title">Son Doğumlar</span></div>
       <div id="births-body"><div class="loader"><div class="spin"></div></div></div>
@@ -2588,6 +2593,18 @@ body.dark .atolye-sayfa-baslik{color:var(--ink)}
       <input type="hidden" id="cx-math-ok">
       <button class="btn btn-r" data-action="submit-cikis">🚪 Çıkışı Onayla</button>
       <button class="btn btn-o" data-action="close-cikis" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SÜRÜDEN ÇIKANLAR MODAL ═══ -->
+<div id="m-cikanlar" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">🚪 Sürüden Çıkanlar</div>
+    <div class="m-body">
+      <input class="srch" id="cikanlar-search" data-input="cikanlar-search" placeholder="🔍 İşletme küpesi, devlet küpesi ya da isim" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:9px">
+      <div id="cikanlar-tabs" style="display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px"></div>
+      <div id="cikanlar-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
 </div>
