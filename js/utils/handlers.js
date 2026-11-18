@@ -171,6 +171,10 @@ registerActions({
 
   // ═══ MODAL AÇ/KAPAT ═══
   'open-modal': (el) => openM(el.dataset.modal),
+  'open-cikanlar': () => { const s=document.getElementById('cikanlar-search'); if(s) s.value=''; openM('m-cikanlar'); loadCikanlar(); },
+  'cikanlar-search': (() => { let _t; return () => { clearTimeout(_t); _t=setTimeout(() => { const b=document.querySelector('#cikanlar-tabs .on'); loadCikanlar(b?b.dataset.durum:'Ölü'); }, 200); }; })(),
+  'cikanlar-tab': (el) => loadCikanlar(el.dataset.durum),
+  'cikanlar-det': (el) => { if (el.dataset.det) { closeM('m-cikanlar'); openDet(el.dataset.det); } },
   // Backdrop kapatma closeM'den geçmeli — direkt classList.remove cleanup'ı
   // atlıyordu (_planliTohumlamaGorevId sızıntısı → B3) ve history.back yapmıyordu
   'mclose-overlay': (el, e) => { if (e.target === el) closeM(el.id); },

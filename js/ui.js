@@ -12860,28 +12860,41 @@ async function loadRaporlar(){
  * Kayıt yoksa boş durum mesajı, hata oluşursa hata mesajı gösterir.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
  */
-async function loadCikanlar(){
+async function loadCikanlar(durum='Ölü'){
   const el=document.getElementById('cikanlar-body'); if(!el) return;
   try {
     const all=await idbGetAll('hayvanlar');
-    const cikanlar=all.filter(a=>a.durum&&a.durum!=='Aktif').sort((a,b)=>(b.cikis_tarihi||b.id||'').localeCompare(a.cikis_tarihi||a.id||''));
-    if(!cikanlar.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Çıkan hayvan kaydı yok</div>'; return; }
-    const durumRenk={Satıldı:'var(--blue)',Kesildi:'var(--amber)',Öldü:'var(--red)',Kayıp:'var(--red)'};
-    el.innerHTML=cikanlar.map(a=>{
+    const cikanlar=all.filter(a=>a.durum&&a.durum!=='Aktif');
+    const q=(((document.getElementById('cikanlar-search')||{}).value)||'').trim();
+    const ql=q.toLocaleLowerCase('tr'), qk=ql.replace(/\s+/g,'').replace(/^tr/,'');
+    const esles=a=>{ const dk=String(a.devlet_kupe||'').toLocaleLowerCase('tr').replace(/\s+/g,'').replace(/^tr/,''); return String(a.kupe_no||'').toLocaleLowerCase('tr').includes(ql)||(qk!==''&&dk.includes(qk))||String(a.isim||a.ad||'').toLocaleLowerCase('tr').includes(ql); };
+    const bulunan=q?cikanlar.filter(esles):cikanlar;
+    const tabsEl=document.getElementById('cikanlar-tabs');
+    if(tabsEl) tabsEl.innerHTML=['Ölü','Satıldı','Kesildi','Kayıp'].map(d=>`<button class="fs-btn${d===durum?' on':''}" style="white-space:nowrap;flex-shrink:0" data-action="cikanlar-tab" data-durum="${escAttr(d)}">${esc(d)} (${bulunan.filter(a=>a.durum===d).length})</button>`).join('');
+    const liste=(q?bulunan:bulunan.filter(a=>a.durum===durum)).sort((a,b)=>{
+      if(a.cikis_tarihi&&b.cikis_tarihi) return b.cikis_tarihi.localeCompare(a.cikis_tarihi);
+      if(a.cikis_tarihi) return -1; if(b.cikis_tarihi) return 1;
+      return String(b.id).localeCompare(String(a.id));
+    });
+    if(!liste.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Bu durumda çıkan hayvan yok</div>'; return; }
+    const durumRenk={Satıldı:'var(--blue)',Kesildi:'var(--amber)',Ölü:'var(--red)',Kayıp:'var(--red)'};
+    el.innerHTML=liste.map(a=>{
       const kupe=a.kupe_no||a.devlet_kupe||a.id;
       const clr=durumRenk[a.durum]||'var(--ink3)';
-      return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:6px">
+      let yas=''; if(a.dogum_tarihi&&a.cikis_tarihi){ const d=new Date(a.dogum_tarihi),c=new Date(a.cikis_tarihi); let m=(c.getFullYear()-d.getFullYear())*12+c.getMonth()-d.getMonth(); if(c.getDate()<d.getDate()) m--; yas=' · çıkışta '+(m>=0?m:0)+' ay'; }
+      return `<div class="stok-item" data-action="cikanlar-det" data-det="${escAttr(a.id)}" style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:6px;cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:700;font-size:.88rem">${esc(kupe)}</div>
-            <div style="font-size:.7rem;color:var(--ink3);margin-top:2px">${esc(a.irk||'—')} · ${esc(a.grup||'—')}</div>
+            <div style="font-weight:700;font-size:.88rem">${esc(kupe)}${(a.isim||a.ad)?` <span style="font-size:.75rem;color:var(--ink2);font-weight:400">${esc(a.isim||a.ad)}</span>`:''}${a.devlet_kupe&&a.kupe_no?` <span style="font-size:.65rem;color:var(--ink3);font-weight:400">${esc(a.devlet_kupe)}</span>`:''}</div>
+            <div style="font-size:.7rem;color:var(--ink3);margin-top:2px">${esc(a.cinsiyet||'—')} · ${esc(a.irk||'—')} · ${esc(a.grup||'—')}</div>
+            <div style="font-size:.65rem;color:var(--ink3);margin-top:2px">Doğum: ${fmtTarih(a.dogum_tarihi)||'—'}${esc(yas)}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:.75rem;font-weight:700;color:${clr}">${esc(a.durum)}</div>
-            <div style="font-size:.65rem;color:var(--ink3)">${fmtTarih(a.cikis_tarihi)||'—'}</div>
+            <div style="font-size:.65rem;color:var(--ink3)">${a.cikis_tarihi?fmtTarih(a.cikis_tarihi):'tarih girilmemiş'}</div>
           </div>
         </div>
-        ${a.cikis_sebebi?`<div style="font-size:.7rem;color:var(--ink3);margin-top:5px;padding-top:5px;border-top:1px solid var(--card2)">${esc(a.cikis_sebebi)}${a.satis_fiyati?' · '+a.satis_fiyati+' ₺':''}</div>`:''}
+        ${a.cikis_sebebi||a.satis_fiyati?`<div style="font-size:.7rem;color:var(--ink3);margin-top:5px;padding-top:5px;border-top:1px solid var(--card2)">${esc(a.cikis_sebebi||'')}${a.satis_fiyati?' · '+esc(a.satis_fiyati)+' ₺':''}</div>`:''}
       </div>`;
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
